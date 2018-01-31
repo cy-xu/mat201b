@@ -21,7 +21,7 @@ struct MyApp : App {
   MyApp() {
     // Choose your own image
     //
-    const char* filename = "mat201b/color_spaces/photoshop.png";
+    const char* filename = "mat201b/color_spaces/office_window.jpg";
 
     // We're putting image in the constructor because we don't need it after we
     // exctract the pixel colors and positions.
@@ -55,6 +55,9 @@ struct MyApp : App {
         // TODO
         // right now you know everything you need to know about the image to
         // build *all* the meshes you'll need.
+
+        cube.vertex(pixel.r / 255.f, pixel.g / 255.f, pixel.b / 255.f);
+
       }
     }
 
@@ -79,8 +82,10 @@ struct MyApp : App {
     //
     if (shouldReset) {
       shouldReset = false;
-      for (unsigned v = 0; v < current.vertices().size(); ++v)
-        current.vertices()[v] = plane.vertices()[v];
+      for (unsigned v = 0; v < current.vertices().size(); ++v){
+        target.vertices()[v].lerp(target.vertices()[v], 0.1f);
+        current.vertices()[v] = target.vertices()[v];
+        }
     }
 
     // TODO
@@ -91,6 +96,9 @@ struct MyApp : App {
     // t is what time it is now
     //
     t += dt;
+
+    // animating the FOV
+    // lens().fovy(30 + 60 * (sin(t) + 1));  
   }
 
   void onDraw(Graphics& g) {
@@ -113,6 +121,10 @@ struct MyApp : App {
         // Add code here
         break;
       case '2':
+      // for (unsigned v = 0; v < current.vertices().size(); ++v)
+        // last.vertices()[v] = current.vertices()[v];
+        // target.vertices()[v] = cube.vertices()[v];
+        target.vertices() = cube.vertices();
         // Add code here
         break;
       case '3':

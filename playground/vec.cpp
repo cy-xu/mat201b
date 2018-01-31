@@ -22,6 +22,18 @@ int main() {
 
   // use lerp to move 'a' half way between 'a' and 'b'
   //
-  a.lerp(b, 0.5);
+  a.lerp(b, 0.1);
   cout << a << endl;
+  a.lerp(b, 0.1);
+  cout << a << endl;
+  a.lerp(b, 0.1);
+  cout << a << endl;
+  a.lerp(b, 0.1);
+  cout << a << endl;
+  a.lerp(b, 0.1);
+  cout << a << endl;
+  // a.lerp(b, 1);
+  // cout << a << endl;
+  // lerp(a,b,0.5)
+  // cout << a << endl;
 }
