@@ -11,7 +11,7 @@ using namespace std;
 
 // some of these must be carefully balanced; i spent some time turning them.
 // change them however you like, but make a note of these settings.
-unsigned particleCount = 100;       // try 2, 5, 50, and 5000
+unsigned particleCount = 100;      // try 2, 5, 50, and 5000
 double maximumAcceleration = 600;  // prevents explosion, loss of particles
 double initialRadius = 50;         // initial condition
 double initialSpeed = 0;           // initial condition
@@ -85,9 +85,8 @@ struct MyApp : App {
         // F = ma where m=1
         Vec3f acceleration;
 
-
         if (d > 2 * sphereRadius) {
-           acceleration = difference / (d * d * d) * gravityFactor;
+          acceleration = difference / (d * d * d) * gravityFactor;
         }
         // equal and opposite force (symmetrical)
 
@@ -104,7 +103,7 @@ struct MyApp : App {
           a.acceleration += acceleration;
           b.acceleration -= acceleration;
         }
-        
+
         // give drag to all sphere
         Vec3f drag = a.velocity * abs(a.velocity) * -dragConstant;
         a.acceleration += drag;
@@ -149,6 +148,9 @@ struct MyApp : App {
   }
 
   void onSound(AudioIO &io) {
+    io();
+    io.out(0) = 1; // left
+    io.out(1) = 1; // right
     while (io()) {
       io.out(0) = 0;
       io.out(1) = 0;
