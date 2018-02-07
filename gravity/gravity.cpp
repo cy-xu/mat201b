@@ -11,7 +11,7 @@ using namespace std;
 
 // some of these must be carefully balanced; i spent some time turning them.
 // change them however you like, but make a note of these settings.
-unsigned particleCount = 100;      // try 2, 5, 50, and 5000
+unsigned particleCount = 2;        // try 2, 5, 50, and 5000
 double maximumAcceleration = 600;  // prevents explosion, loss of particles
 double initialRadius = 50;         // initial condition
 double initialSpeed = 0;           // initial condition
@@ -98,11 +98,11 @@ struct MyApp : App {
         }
 
         // only similar color balls will attract each other
-        double colorEpsilon = 0.2;
-        if (abs(a.c[1] - b.c[1]) < colorEpsilon) {
-          a.acceleration += acceleration;
-          b.acceleration -= acceleration;
-        }
+        // double colorEpsilon = 0.2;
+        // if (abs(a.c[1] - b.c[1]) < colorEpsilon) {
+        a.acceleration += acceleration;
+        b.acceleration -= acceleration;
+        // }
 
         // give drag to all sphere
         Vec3f drag = a.velocity * abs(a.velocity) * -dragConstant;
@@ -149,8 +149,8 @@ struct MyApp : App {
 
   void onSound(AudioIO &io) {
     io();
-    io.out(0) = 1; // left
-    io.out(1) = 1; // right
+    io.out(0) = 1;  // left
+    io.out(1) = 1;  // right
     while (io()) {
       io.out(0) = 0;
       io.out(1) = 0;
