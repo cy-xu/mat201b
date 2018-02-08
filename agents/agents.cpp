@@ -15,7 +15,7 @@ unsigned particleCount = 2;    // try 2, 5, 50, and 5000
 double maxAcceleration = 300;  // prevents explosion, loss of particles
 double maxSpeed = 100;         // mock number
 double initialRadius = 50;     // initial condition
-double initialSpeed = 0;       // initial condition
+double initialSpeed = 100;     // initial condition
 double gravityFactor = 1e1;    // see Gravitational Constant
 // double timeStep = 0.0625;         // keys change this value for effect
 double timeStep = 0.01;      // keys change this value for effect
@@ -39,10 +39,28 @@ struct Particle {
     position = r() * initialRadius;
     // this will tend to spin stuff around the y axis
     velocity = Vec3f(0, 1, 0).cross(position).normalize(initialSpeed);
-    acceleration = Vec3f(0, 0, 0);
+    // acceleration = Vec3f(0, 0, 0);
+    acceleration = r() * initialSpeed;
     c = HSV(rnd::uniform(), 1, 1);
     particles = p;
-    particles->push_back(*this);
+  }
+
+  void flock() {
+    Vec3f sep = separate();
+    Vec3f ali = align();
+    Vec3f coh = cohesion();
+
+    sep = sep * 1.5f;
+    ali = ali * 1.0f;
+    coh = coh * 1.0f;
+
+    applyForce(sep);
+    applyForce(ali);
+    applyForce(coh);
+
+    velocity += acceleration * timeStep;
+    position += velocity * timeStep;
+    acceleration.zero();
   }
 
   void draw(Graphics &g) {
@@ -53,27 +71,9 @@ struct Particle {
     g.popMatrix();
   }
 
-  void applyForce(Vec3f force, Vec3f target) { target += force; }
+  void applyForce(Vec3f force) { acceleration += force; }
 
-  void flock() {
-    Vec3f sep = separate(*particles);
-    Vec3f ali = align(*particles);
-    Vec3f coh = cohesion(*particles);
-
-    sep = sep * 1.5f;
-    ali = ali * 1.0f;
-    coh = coh * 1.0f;
-
-    applyForce(sep, acceleration);
-    applyForce(ali, acceleration);
-    applyForce(coh, acceleration);
-
-    velocity += acceleration * timeStep;
-    position += velocity * timeStep;
-    acceleration.zero();
-  }
-
-  Vec3f separate(vector<Particle> particle) {
+  Vec3f separate() {
     int count = 0;
     Vec3f steer;
 
@@ -98,7 +98,7 @@ struct Particle {
     return steer;
   }
 
-  Vec3f align(vector<Particle> particle) {
+  Vec3f align() {
     int count = 0;
     Vec3f steer;
     Vec3f sum;
@@ -121,7 +121,7 @@ struct Particle {
     }
   }
 
-  Vec3f cohesion(vector<Particle> particle) {
+  Vec3f cohesion() {
     int count = 0;
     Vec3f sum;
 
@@ -155,7 +155,7 @@ struct MyApp : App {
   Light light;
   bool simulate = true;
 
-  vector<Particle> particle;
+  vector<Particle> particleList;
 
   MyApp() {
     addSphere(sphere, sphereRadius);
@@ -165,8 +165,10 @@ struct MyApp : App {
     lens().far(400);      // set the far clipping plane
     background(Color(0.07));
 
-    particle.resize(particleCount);  // make all the particles
-
+    for (int i = 0; i < particleCount; i++) {
+      Particle par(&particleList);
+      particleList.push_back(par);
+    }
     initWindow();
     initAudio();
   }
@@ -175,41 +177,19 @@ struct MyApp : App {
     if (!simulate)
       // skip the rest of this function
       return;
+    for (auto p : particleList) {
+      p.flock();
+      cout << "current p's acceleration is " << p.acceleration << endl;
+      cout << "current p's velocity is " << p.velocity << endl;
+    }
   }
-
-  // Limit acceleration
-  // unsigned limitCount = 0;
-  // for (auto &p : particle) {
-  //   if (p.acceleration.mag() > maxAcceleration) {
-  //     p.acceleration.normalize(maxAcceleration);
-  //     limitCount++;
-  //   }
-  // }
-  // printf("%u of %u limited\n", limitCount, particle.size());
-
-  // Euler's Method; Keep the time step small
-  // for (auto &p : particle) {
-  //   p.position += p.velocity * timeStep;
-  // }
-
-  // for (auto &p : particle) {
-  //   p.velocity += p.acceleration * timeStep;
-  // }
-
-  // for (auto &p : particle) {
-  //   cout << "Current P.acceleration is " << p.acceleration << endl;
-  //   p.acceleration.zero();
-  //   cout << "Current P.acceleration is " << p.acceleration << endl;
-  // }
-  // }
 
   void onDraw(Graphics &g) {
     material();
     light();
     g.scale(scaleFactor);
-    for (auto p : particle) {
+    for (auto p : particleList) {
       p.draw(g);
-      p.flock();
     }
   }
 
