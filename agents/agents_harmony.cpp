@@ -118,7 +118,7 @@ struct Particle {
     for (auto other : *particles) {
       Vec3f difference = (position - other.position);
       float d = difference.mag();
-      if (d > 0 && d < 30 * sphereRadius) {
+      if (d > 0 && d < 10 * sphereRadius) {
         sum += other.acceleration;
         count++;
       }
