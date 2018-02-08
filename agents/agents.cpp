@@ -70,7 +70,7 @@ struct Particle {
 
     velocity += acceleration * timeStep;
     position += velocity * timeStep;
-    acceleration.zero();
+    // acceleration.zero();
   }
 
   Vec3f separate(vector<Particle> particle) {
@@ -176,32 +176,6 @@ struct MyApp : App {
       // skip the rest of this function
       return;
   }
-
-  // Limit acceleration
-  // unsigned limitCount = 0;
-  // for (auto &p : particle) {
-  //   if (p.acceleration.mag() > maxAcceleration) {
-  //     p.acceleration.normalize(maxAcceleration);
-  //     limitCount++;
-  //   }
-  // }
-  // printf("%u of %u limited\n", limitCount, particle.size());
-
-  // Euler's Method; Keep the time step small
-  // for (auto &p : particle) {
-  //   p.position += p.velocity * timeStep;
-  // }
-
-  // for (auto &p : particle) {
-  //   p.velocity += p.acceleration * timeStep;
-  // }
-
-  // for (auto &p : particle) {
-  //   cout << "Current P.acceleration is " << p.acceleration << endl;
-  //   p.acceleration.zero();
-  //   cout << "Current P.acceleration is " << p.acceleration << endl;
-  // }
-  // }
 
   void onDraw(Graphics &g) {
     material();

@@ -72,10 +72,6 @@ struct MyApp : App {
       // skip the rest of this function
       return;
 
-    //
-    //  Detect Collisions Here
-    //
-
     for (unsigned i = 0; i < particle.size(); ++i)
       for (unsigned j = 1 + i; j < particle.size(); ++j) {
         Particle &a = particle[i];
