@@ -33,8 +33,11 @@ Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
 struct Particle {
   Vec3f position, velocity, acceleration;
   Color c;
+  // *particles is the pointer to the actual particleList
   vector<Particle> *particles;
 
+  // using *p here because we don't want to copy the actual particleList every
+  // time creating an instance, so using a pointer here
   Particle(vector<Particle> *p) {
     position = r() * initialRadius;
     // this will tend to spin stuff around the y axis
@@ -42,10 +45,14 @@ struct Particle {
     // acceleration = Vec3f(0, 0, 0);
     acceleration = r() * initialSpeed;
     c = HSV(rnd::uniform(), 1, 1);
+    // pointing the *p to *particles so we can access the actual vector
+    // via *p, by accessing *particles
     particles = p;
   }
 
   void flock() {
+    // since *particles is in the Particle class, no need to bring into the
+    // functions.
     Vec3f sep = separate();
     Vec3f ali = align();
     Vec3f coh = cohesion();
@@ -60,7 +67,7 @@ struct Particle {
 
     velocity += acceleration * timeStep;
     position += velocity * timeStep;
-    // acceleration.zero();
+    acceleration.zero();
   }
 
   void draw(Graphics &g) {
@@ -155,6 +162,7 @@ struct MyApp : App {
   Light light;
   bool simulate = true;
 
+  // creating the real particleList, it's now empty
   vector<Particle> particleList;
 
   MyApp() {
@@ -165,6 +173,7 @@ struct MyApp : App {
     lens().far(400);      // set the far clipping plane
     background(Color(0.07));
 
+    // pushing every Particle instance into the actual list
     for (int i = 0; i < particleCount; i++) {
       Particle par(&particleList);
       particleList.push_back(par);
