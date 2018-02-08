@@ -95,7 +95,7 @@ struct Particle {
       Vec3f difference = (position - other.position);
       float d = difference.mag();
       // if agents is getting closer, push away
-      if (d > 0 && d < 4 * sphereRadius) {
+      if (d > 0 && d < 6 * sphereRadius) {
         steer += difference.normalize() / d;
         count++;
       }
@@ -118,7 +118,7 @@ struct Particle {
     for (auto other : *particles) {
       Vec3f difference = (position - other.position);
       float d = difference.mag();
-      if (d > 0 && d < 10 * sphereRadius) {
+      if (d > 0 && d < 12 * sphereRadius) {
         sum += other.acceleration;
         count++;
       }
@@ -140,7 +140,7 @@ struct Particle {
     for (auto other : *particles) {
       Vec3f difference = (position - other.position);
       float d = difference.mag();
-      if (d > 0 && d < 30 * sphereRadius) {
+      if (d > 0 && d < 12 * sphereRadius) {
         sum += other.position;
         count++;
       }
