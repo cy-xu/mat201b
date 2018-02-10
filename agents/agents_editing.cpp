@@ -5,6 +5,12 @@ Based on starter code by Karl Yerkes
 MIT License (details omitted)
 */
 
+// struct boid;
+// struct clan (boids);
+// struct target;
+// struct targetGroup;
+// struct myApp (clan, targetGroup)
+
 #include "allocore/io/al_App.hpp"
 using namespace al;
 using namespace std;
@@ -16,23 +22,22 @@ double maxAcceleration = 300;  // prevents explosion, loss of particles
 double maxSpeed = 50;          // mock number
 double initialRadius = 50;     // initial condition
 double initialSpeed = 100;     // initial condition
-double gravityFactor = 1e1;    // see Gravitational Constant
-// double timeStep = 0.0625;         // keys change this value for effect
-double timeStep = 0.001;     // keys change this value for effect
-double scaleFactor = 0.1;    // resizes the entire scene
-double sphereRadius = 2;     // increase this to make collisions more frequent
-float springConstant = 500;  // spring characteristic constant
-float dragConstant = 0.001;  // drag constant
-float steerFactor = -1e1;    // Seperation steer constant
+double timeStep = 0.001;       // keys change this value for effect
+double scaleFactor = 0.1;      // resizes the entire scene
+double sphereRadius = 2;       // increase this to make collisions more frequent
+float steerFactor = -1e1;      // Seperation steer constant
 
-Mesh sphere;  // global prototype; leave this alone
+Mesh yuanqiu;  // global prototype; leave this alone
+// Mesh prey;
 
 // helper function: makes a random vector
 Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
 
 struct Particle {
-  Vec3f position, velocity, acceleration;
+  Vec3f position, velocity, acceleration, target;
+  Pose pose;
   Color c;
+
   // *particles is the pointer to the actual particleList
   vector<Particle> *particles;
 
@@ -41,7 +46,7 @@ struct Particle {
   Particle(vector<Particle> *p) {
     position = r() * initialRadius;
     // this will tend to spin stuff around the y axis
-    velocity = Vec3f(0, 100, 0).cross(position).normalize(initialSpeed);
+    velocity = Vec3f(100, 100, 0).cross(position).normalize(initialSpeed);
     acceleration = Vec3f(0, 0, 0);
     // acceleration = r() * initialSpeed;
     c = HSV(rnd::uniform(), 1, 1);
@@ -79,7 +84,7 @@ struct Particle {
     g.pushMatrix();
     g.translate(position);
     g.color(c);
-    g.draw(sphere);
+    g.draw(yuanqiu);
     g.popMatrix();
   }
 
@@ -162,6 +167,49 @@ struct Particle {
   }
 };
 
+struct Target {
+  Vec3f position, velocity, acceleration;
+  Color c;
+  Mesh mubiao;
+  // Target();
+
+  Target() {
+    position = r() * initialRadius;
+    velocity = Vec3f(0, 0, 0).cross(position).normalize(initialSpeed);
+    acceleration = Vec3f(0, 0, 0);
+    Color c = HSV(rnd::uniform(), 1, 1);
+  }
+
+  void dingyi(float width, float height, float depth) {
+    addWireBox(mubiao, width, height, depth);
+    mubiao.generateNormals();
+  }
+
+  void update() {
+    // position = r() * initialRadius;
+
+    // since *particles is in the Particle class, no need to bring into the
+    // // functions.
+    // Vec3f sep = separate();
+    // Vec3f ali = align();
+    // Vec3f coh = cohesion();
+
+    velocity += acceleration * timeStep;
+    position += velocity * timeStep;
+    // printf("in update: position %f %f %f\n", position.x, position.y,
+    //        position.z);
+    acceleration.zero();
+  }
+
+  void draw(Graphics &g) {
+    g.pushMatrix();
+    g.translate(position);
+    g.color(c);
+    g.draw(mubiao);
+    g.popMatrix();
+  }
+};
+
 struct MyApp : App {
   Material material;
   Light light;
@@ -169,20 +217,23 @@ struct MyApp : App {
 
   // creating the real particleList, it's now empty
   vector<Particle> particleList;
+  Target mubiaoOne;
 
   MyApp() {
-    addSphere(sphere, sphereRadius);
-    sphere.generateNormals();
+    addSphere(yuanqiu, sphereRadius);
+    yuanqiu.generateNormals();
     light.pos(0, 0, 0);   // place the light
     nav().pos(0, 0, 30);  // place the viewer
     lens().far(400);      // set the far clipping plane
     background(Color(0.07));
+    mubiaoOne.dingyi(5.f, 5.f, 5.f);
 
     // pushing every Particle instance into the actual list
     for (int i = 0; i < particleCount; i++) {
       Particle par(&particleList);
       particleList.push_back(par);
     }
+
     initWindow();
     initAudio();
   }
@@ -194,6 +245,7 @@ struct MyApp : App {
     for (int i = 0; i < particleList.size(); ++i) {
       particleList[i].update();
     }
+    // prey.update();
 
     unsigned limitCount = 0;
     for (int i = 0; i < particleList.size(); ++i) {
@@ -212,11 +264,24 @@ struct MyApp : App {
     for (auto p : particleList) {
       p.draw(g);
     }
+    mubiaoOne.draw(g);
   }
 
   void onKeyDown(const ViewpointWindow &, const Keyboard &k) {
     switch (k.key()) {
       default:
+      case 'i':
+        mubiaoOne.acceleration.y += 5;
+        break;
+      case 'o':
+        mubiaoOne.acceleration.y -= 5;
+        break;
+      case 'u':
+        mubiaoOne.acceleration.x -= 5;
+        break;
+      case 'p':
+        mubiaoOne.acceleration.x += 5;
+        break;
       case '1':
         // reverse time
         timeStep *= -1;
