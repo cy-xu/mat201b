@@ -14,7 +14,8 @@ MIT License (details omitted)
 #include "Cuttlebone/Cuttlebone.hpp"
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Ray.hpp"
-// #include "common.hpp"
+
+#include "agents_common.hpp"
 
 using namespace al;
 using namespace std;
@@ -32,7 +33,7 @@ double sphereRadius = 2;       // increase this to make collisions more frequent
 float steerFactor = -1e1;      // Seperation steer constant
 
 Mesh yuanqiu;  // global prototype; leave this alone
-// Mesh prey;
+Mesh mubiao;   // global target
 
 // helper function: makes a random vector
 Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
@@ -79,6 +80,7 @@ struct Particle {
 
     velocity += acceleration * timeStep;
     position += velocity * timeStep;
+
     // printf("in update: position %f %f %f\n", position.x, position.y,
     //        position.z);
     acceleration.zero();
@@ -99,8 +101,8 @@ struct Particle {
     Vec3f steer;
 
     for (auto other : *particles) {
-      // this difference is a vector from b to a, put this force on a, so push
-      // away.
+      // this difference is a vector from b to a, put this force on a, so
+      // push away.
       Vec3f difference = (position - other.position);
       float d = difference.mag();
       // if agents is getting closer, push away
@@ -169,40 +171,36 @@ struct Particle {
     Vec3f steer = desired - velocity;
     return steer;
   }
+
+  void seekTarget(Vec3f target) {
+    Vec3f desired = target - position;
+    Vec3f steer = desired - velocity;
+    steer.normalize(maxAcceleration);
+    applyForce(steer);
+  }
 };
 
 struct Target {
   Vec3f position, velocity, acceleration;
   Color c;
-  Mesh mubiao;
 
   Target() {
-    position = r() * initialRadius;
-    velocity = Vec3f(0, 0, 0).cross(position).normalize(initialSpeed);
+    position = Vec3f(0, 0, 0);
+    velocity = Vec3f(0, 0, 0);
     acceleration = Vec3f(0, 0, 0);
     Color c = HSV(rnd::uniform(), 1, 1);
   }
 
-  void dingyi(float width, float height, float depth) {
-    addWireBox(mubiao, width, height, depth);
-    mubiao.generateNormals();
-  }
-
   void update() {
-    // position = r() * initialRadius;
-
-    // since *particles is in the Particle class, no need to bring into the
-    // // functions.
-    // Vec3f sep = separate();
-    // Vec3f ali = align();
-    // Vec3f coh = cohesion();
-
-    velocity += acceleration * timeStep;
-    position += velocity * timeStep;
-    // printf("in update: position %f %f %f\n", position.x, position.y,
-    //        position.z);
-    acceleration.zero();
+    velocity += acceleration;
+    position += velocity;
+    // acceleration.zero();
   }
+
+  // virtual void onMouseMove(const ViewpointWindow &w, const Mouse &mubiao) {
+  //   Rayd mouse_ray = getPickRay(w, mubiao.x(), mubiao.y());
+  //   targetState.target_position = mouse_ray(10.0);
+  // }
 
   void draw(Graphics &g) {
     g.pushMatrix();
@@ -218,24 +216,36 @@ struct MyApp : App {
   Light light;
   bool simulate = true;
 
+  State appState;
+  cuttlebone::Maker<State> maker;
+
   // creating the real particleList, it's now empty
   vector<Particle> particleList;
+
   Target mubiaoOne;
 
-  MyApp() {
+  MyApp() : maker("127.0.0.1") {
     addSphere(yuanqiu, sphereRadius);
     yuanqiu.generateNormals();
+
+    addWireBox(mubiao, 10, 10, 5);
+    mubiao.generateNormals();
+
     light.pos(0, 0, 0);   // place the light
     nav().pos(0, 0, 30);  // place the viewer
     lens().far(400);      // set the far clipping plane
     background(Color(0.07));
-    mubiaoOne.dingyi(5.f, 5.f, 5.f);
 
     // pushing every Particle instance into the actual list
     for (int i = 0; i < particleCount; i++) {
       Particle par(&particleList);
       particleList.push_back(par);
     }
+    // push the initial vector to state
+    // appState.particle_list = particleList;
+
+    // mouse control
+    navControl().useMouse(false);
 
     initWindow();
     initAudio();
@@ -245,10 +255,20 @@ struct MyApp : App {
     if (!simulate)
       // skip the rest of this function
       return;
+
+    maker.set(appState);
+
     for (int i = 0; i < particleList.size(); ++i) {
       particleList[i].update();
+      appState.particle_position = particleList[i].position;
+      appState.index = i;
+      // send state to maker
+      particleList[i].seekTarget(mubiaoOne.position);
     }
-    // prey.update();
+
+    mubiaoOne.update();
+    appState.target_position = mubiaoOne.position;
+    // mubiaoOne.onMouseMove(w, mubiaoOne);
 
     unsigned limitCount = 0;
     for (int i = 0; i < particleList.size(); ++i) {
@@ -257,33 +277,34 @@ struct MyApp : App {
         limitCount++;
       }
     }
-    printf("%u of %u limited\n", limitCount, particleList.size());
+    printf("%u of %lu limited\n", limitCount, particleList.size());
   }
 
   void onDraw(Graphics &g) {
     material();
     light();
     g.scale(scaleFactor);
-    for (auto p : particleList) {
-      p.draw(g);
+    for (auto par : particleList) {
+      par.draw(g);
     }
     mubiaoOne.draw(g);
   }
 
   void onKeyDown(const ViewpointWindow &, const Keyboard &k) {
+    float targetAcceleration = 5;
     switch (k.key()) {
       default:
-      case 'i':
-        mubiaoOne.acceleration.y += 5;
-        break;
-      case 'o':
-        mubiaoOne.acceleration.y -= 5;
-        break;
-      case 'u':
-        mubiaoOne.acceleration.x -= 5;
-        break;
       case 'p':
-        mubiaoOne.acceleration.x += 5;
+        mubiaoOne.position.y += targetAcceleration;
+        break;
+      case ';':
+        mubiaoOne.position.y -= targetAcceleration;
+        break;
+      case 'l':
+        mubiaoOne.position.x -= targetAcceleration;
+        break;
+      case '"':
+        mubiaoOne.position.x += targetAcceleration;
         break;
       case '1':
         // reverse time
@@ -305,4 +326,9 @@ struct MyApp : App {
   }
 };
 
-int main() { MyApp().start(); }
+int main() {
+  MyApp app;
+  app.maker.start();
+  app.start();
+  // MyApp().start();
+}
