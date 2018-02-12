@@ -13,7 +13,6 @@ MIT License (details omitted)
 
 #include "Cuttlebone/Cuttlebone.hpp"
 #include "allocore/io/al_App.hpp"
-#include "allocore/math/al_Ray.hpp"
 
 #include "agents_common.hpp"
 
@@ -27,7 +26,7 @@ double maxAcceleration = 300;  // prevents explosion, loss of particles
 double maxSpeed = 50;          // mock number
 double initialRadius = 50;     // initial condition
 double initialSpeed = 100;     // initial condition
-double timeStep = 0.001;       // keys change this value for effect
+double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
 float steerFactor = -1e1;      // Seperation steer constant
@@ -101,8 +100,8 @@ struct Particle {
     Vec3f steer;
 
     for (auto other : *particles) {
-      // this difference is a vector from b to a, put this force on a, so push
-      // away.
+      // this difference is a vector from b to a, put this force on a, so
+      // push away.
       Vec3f difference = (position - other.position);
       float d = difference.mag();
       // if agents is getting closer, push away
@@ -175,7 +174,7 @@ struct Particle {
   void seekTarget(Vec3f target) {
     Vec3f desired = target - position;
     Vec3f steer = desired - velocity;
-    steer.normalize(maxAcceleration);
+    steer.normalize(maxSpeed);
     applyForce(steer);
   }
 };
@@ -215,20 +214,20 @@ struct MyApp : App {
   Material material;
   Light light;
   bool simulate = true;
-  // Mesh mubiao;
 
   State appState;
   cuttlebone::Taker<State> taker;
 
   // creating the real particleList, it's now empty
   vector<Particle> particleList;
+
   Target mubiaoOne;
 
   MyApp() {
     addSphere(yuanqiu, sphereRadius);
     yuanqiu.generateNormals();
 
-    addWireBox(mubiao, 10, 10, 5);
+    addWireBox(mubiao, 10, 10, 10);
     mubiao.generateNormals();
 
     light.pos(0, 0, 0);   // place the light
@@ -240,11 +239,12 @@ struct MyApp : App {
     for (int i = 0; i < particleCount; i++) {
       Particle par(&particleList);
       particleList.push_back(par);
-      // particleList = appState.particle_list;
     }
+    // push the initial vector to state
+    // appState.particle_list = particleList;
 
     // mouse control
-    // navControl().useMouse(false);
+    navControl().useMouse(false);
 
     initWindow();
     initAudio();
@@ -257,15 +257,17 @@ struct MyApp : App {
 
     taker.get(appState);
 
-    // for (int i = 0; i < particleList.size(); ++i) {
-    // particleList[i].update();
-    int i = appState.index;
-    particleList[i].position = appState.particle_position;
-    // }
-
-    // Target
     mubiaoOne.update();
     mubiaoOne.position = appState.target_position;
+    // mubiaoOne.onMouseMove(w, mubiaoOne);
+
+    for (int i = 0; i < particleList.size(); ++i) {
+      particleList[i].update();
+      //   particleList[i].position = appState.particle_position;
+      //   i = appState.index;
+      // send state to maker
+      particleList[i].seekTarget(mubiaoOne.position);
+    }
 
     unsigned limitCount = 0;
     for (int i = 0; i < particleList.size(); ++i) {
@@ -287,44 +289,44 @@ struct MyApp : App {
     mubiaoOne.draw(g);
   }
 
-  // void onKeyDown(const ViewpointWindow &, const Keyboard &k) {
-  //   switch (k.key()) {
-  //     default:
-  //     case 'i':
-  //       mubiaoOne.acceleration.y += 5;
-  //       break;
-  //     case 'o':
-  //       mubiaoOne.acceleration.y -= 5;
-  //       break;
-  //     case 'u':
-  //       mubiaoOne.acceleration.x -= 5;
-  //       break;
-  //     case 'p':
-  //       mubiaoOne.acceleration.x += 5;
-  //       break;
-  //     case '1':
-  //       // reverse time
-  //       timeStep *= -1;
-  //       break;
-  //     case '2':
-  //       // speed up time
-  //       if (timeStep < 1) timeStep *= 2;
-  //       break;
-  //     case '3':
-  //       // slow down time
-  //       if (timeStep > 0.0005) timeStep /= 2;
-  //       break;
-  //     case '4':
-  //       // pause the simulation
-  //       //   simulate = !simulate;
-  //       break;
+  //   void onKeyDown(const ViewpointWindow &, const Keyboard &k) {
+  //     float targetAcceleration = 5;
+  //     switch (k.key()) {
+  //       default:
+  //       case 'p':
+  //         mubiaoOne.position.y += targetAcceleration;
+  //         break;
+  //       case ';':
+  //         mubiaoOne.position.y -= targetAcceleration;
+  //         break;
+  //       case 'l':
+  //         mubiaoOne.position.x -= targetAcceleration;
+  //         break;
+  //       case '"':
+  //         mubiaoOne.position.x += targetAcceleration;
+  //         break;
+  //       case '1':
+  //         // reverse time
+  //         timeStep *= -1;
+  //         break;
+  //       case '2':
+  //         // speed up time
+  //         if (timeStep < 1) timeStep *= 2;
+  //         break;
+  //       case '3':
+  //         // slow down time
+  //         if (timeStep > 0.0005) timeStep /= 2;
+  //         break;
+  //       case '4':
+  //         // pause the simulation
+  //         //   simulate = !simulate;
+  //         break;
+  //     }
   //   }
-  // }
 };
 
 int main() {
   MyApp app;
   app.taker.start();
   app.start();
-  // MyApp().start();
 }

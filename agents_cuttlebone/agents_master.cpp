@@ -27,7 +27,7 @@ double maxAcceleration = 300;  // prevents explosion, loss of particles
 double maxSpeed = 50;          // mock number
 double initialRadius = 50;     // initial condition
 double initialSpeed = 100;     // initial condition
-double timeStep = 0.001;       // keys change this value for effect
+double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
 float steerFactor = -1e1;      // Seperation steer constant
@@ -175,7 +175,7 @@ struct Particle {
   void seekTarget(Vec3f target) {
     Vec3f desired = target - position;
     Vec3f steer = desired - velocity;
-    steer.normalize(maxAcceleration);
+    steer.normalize(maxSpeed);
     applyForce(steer);
   }
 };
@@ -258,17 +258,17 @@ struct MyApp : App {
 
     maker.set(appState);
 
-    for (int i = 0; i < particleList.size(); ++i) {
-      particleList[i].update();
-      appState.particle_position = particleList[i].position;
-      appState.index = i;
-      // send state to maker
-      particleList[i].seekTarget(mubiaoOne.position);
-    }
-
     mubiaoOne.update();
     appState.target_position = mubiaoOne.position;
     // mubiaoOne.onMouseMove(w, mubiaoOne);
+
+    for (int i = 0; i < particleList.size(); ++i) {
+      particleList[i].update();
+      // appState.particle_position = particleList[i].position;
+      // appState.index = i;
+      // send state to maker
+      particleList[i].seekTarget(mubiaoOne.position);
+    }
 
     unsigned limitCount = 0;
     for (int i = 0; i < particleList.size(); ++i) {
@@ -330,5 +330,4 @@ int main() {
   MyApp app;
   app.maker.start();
   app.start();
-  // MyApp().start();
 }
