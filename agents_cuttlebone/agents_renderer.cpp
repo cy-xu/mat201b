@@ -48,9 +48,9 @@ struct Particle {
   // using *p here because we don't want to copy the actual particleList every
   // time creating an instance, so using a pointer here
   Particle(vector<Particle> *p) {
-    position = r() * initialRadius;
+    pose.pos() = r() * initialRadius;
     // this will tend to spin stuff around the y axis
-    velocity = Vec3f(100, 100, 0).cross(position).normalize(initialSpeed);
+    velocity = Vec3f(100, 100, 0).cross(pose.pos()).normalize(initialSpeed);
     acceleration = Vec3f(0, 0, 0);
     // acceleration = r() * initialSpeed;
     c = HSV(rnd::uniform(), 1, 1);
@@ -69,7 +69,7 @@ struct Particle {
     // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
     // 1.0 , 1.0 , 1.0 is an interesting stable combination
 
-    sep = sep * 1.0f;
+    sep = sep * 2.0f;
     ali = ali * 1.0f;
     coh = coh * 1.0f;
 
@@ -78,7 +78,7 @@ struct Particle {
     applyForce(coh);
 
     velocity += acceleration * timeStep;
-    position += velocity * timeStep;
+    pose.pos() += velocity * timeStep;
 
     // printf("in update: position %f %f %f\n", position.x, position.y,
     //        position.z);
@@ -87,7 +87,8 @@ struct Particle {
 
   void draw(Graphics &g) {
     g.pushMatrix();
-    g.translate(position);
+    g.translate(pose.pos());
+    g.rotate(pose.quat().inverse());
     g.color(c);
     g.draw(yuanqiu);
     g.popMatrix();
@@ -102,7 +103,7 @@ struct Particle {
     for (auto other : *particles) {
       // this difference is a vector from b to a, put this force on a, so
       // push away.
-      Vec3f difference = (position - other.position);
+      Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
       // if agents is getting closer, push away
       if (d > 0 && d < 6 * sphereRadius) {
@@ -126,7 +127,7 @@ struct Particle {
     Vec3f sum;
 
     for (auto other : *particles) {
-      Vec3f difference = (position - other.position);
+      Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
       if (d > 0 && d < 12 * sphereRadius) {
         sum += other.acceleration;
@@ -148,10 +149,10 @@ struct Particle {
     Vec3f sum;
 
     for (auto other : *particles) {
-      Vec3f difference = (position - other.position);
+      Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
       if (d > 0 && d < 12 * sphereRadius) {
-        sum += other.position;
+        sum += other.pose.pos();
         count++;
       }
     }
@@ -165,14 +166,14 @@ struct Particle {
   }
 
   Vec3f seek(Vec3f target) {
-    Vec3f desired = target - position;
+    Vec3f desired = target - pose.pos();
     desired.normalize(maxSpeed);
     Vec3f steer = desired - velocity;
     return steer;
   }
 
   void seekTarget(Vec3f target) {
-    Vec3f desired = target - position;
+    Vec3f desired = target - pose.pos();
     Vec3f steer = desired - velocity;
     steer.normalize(maxSpeed);
     applyForce(steer);
@@ -198,7 +199,7 @@ struct Target {
 
   // virtual void onMouseMove(const ViewpointWindow &w, const Mouse &mubiao) {
   //   Rayd mouse_ray = getPickRay(w, mubiao.x(), mubiao.y());
-  //   targetState.target_position = mouse_ray(10.0);
+  //   targetState.targetPosition = mouse_ray(10.0);
   // }
 
   void draw(Graphics &g) {
@@ -220,25 +221,32 @@ struct MyApp : App {
 
   // creating the real particleList, it's now empty
   vector<Particle> particleList;
+  vector<Vec3f> particlePositions;
+  vector<Color> particleColors;
 
   Target mubiaoOne;
 
   MyApp() {
-    addSphere(yuanqiu, sphereRadius);
+    addCone(yuanqiu, sphereRadius, Vec3f(0, 0, sphereRadius * 3), 16, 1);
     yuanqiu.generateNormals();
 
     addWireBox(mubiao, 10, 10, 10);
+    // addCube(mubiao, true, 10);
     mubiao.generateNormals();
 
-    light.pos(0, 0, 0);   // place the light
-    nav().pos(0, 0, 30);  // place the viewer
-    lens().far(400);      // set the far clipping plane
+    light.pos(0, 10, 20);  // place the light
+    nav().pos(0, 0, 30);   // place the viewer
+    lens().far(400);       // set the far clipping plane
     background(Color(0.07));
+
+    // taker.get(appState);
 
     // pushing every Particle instance into the actual list
     for (int i = 0; i < particleCount; i++) {
       Particle par(&particleList);
       particleList.push_back(par);
+      // particleList[i].c = appState.particleColors[i];
+      // particleList[i].pose.pos() = appState.particlePositions[i];
     }
     // push the initial vector to state
     // appState.particle_list = particleList;
@@ -258,7 +266,7 @@ struct MyApp : App {
     taker.get(appState);
 
     mubiaoOne.update();
-    mubiaoOne.position = appState.target_position;
+    mubiaoOne.position = appState.targetPosition;
     // mubiaoOne.onMouseMove(w, mubiaoOne);
 
     for (int i = 0; i < particleList.size(); ++i) {
@@ -266,7 +274,8 @@ struct MyApp : App {
       //   particleList[i].position = appState.particle_position;
       //   i = appState.index;
       // send state to maker
-      particleList[i].seekTarget(mubiaoOne.position);
+      particleList[i].pose.pos() = appState.particlePositions[i];
+      // particleList[i].seekTarget(mubiaoOne.position);
     }
 
     unsigned limitCount = 0;

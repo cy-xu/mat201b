@@ -7,12 +7,9 @@ using namespace al;
 // Common definition of application state
 //
 struct State {
-  Vec3f particle_position;
-  int index;
-
-  Vec3f target_position;
-
-  // vector<Particle> particle_list;
+  vector<Color> particleColors;
+  vector<Vec3f> particlePositions;
+  Vec3f targetPosition;
 };
 
 #endif
