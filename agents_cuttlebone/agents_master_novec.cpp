@@ -12,10 +12,10 @@ MIT License (details omitted)
 // struct myApp (clan, targetGroup)
 
 #include "Cuttlebone/Cuttlebone.hpp"
-#include "agents_common.hpp"
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Ray.hpp"
-#include "allocore/math/al_Vec.hpp"
+
+#include "agents_common.hpp"
 
 using namespace al;
 using namespace std;
@@ -238,9 +238,8 @@ struct MyApp : App {
 
   // creating the real particleList, it's now empty
   vector<Particle> particleList;
-  vector<Vec3f> particlePositions;
-  FakeVector parPositions;
-  // vector<Vec3f> particleColors;
+  vector<Pose> particlePoses;
+  vector<Color> particleColors;
 
   Target mubiaoOne;
 
@@ -263,9 +262,15 @@ struct MyApp : App {
     for (int i = 0; i < particleCount; i++) {
       Particle par(&particleList);
       particleList.push_back(par);
-      // particleColors.push_back(par.c);
-      particlePositions.push_back(par.pose.pos());
+      particleColors.push_back(par.c);
+      particlePoses.push_back(par.pose);
     }
+    // push the initial particles status to state
+    appState.particleColors = particleColors;
+    appState.particlePoses = particlePoses;
+
+    // mouse control
+    navControl().useMouse(false);
 
     initWindow();
     initAudio();
@@ -304,10 +309,10 @@ struct MyApp : App {
         particleList[i].seekTarget(Vec3d(mubiaoOne.position));
       }
       particleList[i].pose.faceToward(mubiaoOne.position);
-      particlePositions[i] = particleList[i].pose.pos();
+      particlePoses[i] = particleList[i].pose;
     }
     // send all particle position
-    appState.parPositions.fill_stuff(particlePositions);
+    appState.particlePoses = particlePoses;
 
     // limiting paritcle acceleration
     unsigned limitCount = 0;

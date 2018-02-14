@@ -34,6 +34,9 @@ struct Reverb {
 // p() + r(s()) * gain()
 
 struct MyApp : App {
+  Sawtooth saw;
+  Phasor frequency;
+
   MyApp() {
     initWindow();
     initAudio(44100);
@@ -41,29 +44,12 @@ struct MyApp : App {
     frequency.frequency(0.7, 44100);
   }
 
-  Sawtooth saw;
-  Phasor frequency;
-
   void onSound(AudioIOData& io) {
     while (io()) {
       saw.frequency(200 + 100 * frequency(), 44100);
       float s = saw() * 0.3;
       io.out(0) = s;
       io.out(1) = s;
-    }
-  }
-
-  void onKeyDown(const ViewpointWindow&, const Keyboard& k) {
-    switch (k.key()) {
-      default:
-      case '1':
-        break;
-      case '2':
-        break;
-      case '3':
-        break;
-      case '4':
-        break;
     }
   }
 
