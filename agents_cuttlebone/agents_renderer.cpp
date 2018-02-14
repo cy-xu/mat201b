@@ -163,6 +163,7 @@ struct MyApp : App {
       particles[i].pose.pos().x = appState.parPositions.stuff[i].x;
       particles[i].pose.pos().y = appState.parPositions.stuff[i].y;
       particles[i].pose.pos().z = appState.parPositions.stuff[i].z;
+      particles[i].pose.faceToward(mubiaoOne.position);
     }
 
     // nav().faceToward(mubiaoOne.position);

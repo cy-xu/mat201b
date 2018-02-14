@@ -260,6 +260,7 @@ struct MyApp : App {
   vector<Particle> particleList;
   vector<Vec3f> particlePositions;
   FakeVector parPositions;
+
   // vector<Vec3f> particleColors;
 
   Target mubiaoOne;
