@@ -34,6 +34,7 @@ float steerFactor = -1e1;      // Seperation steer constant
 
 Mesh yuanqiu;  // global prototype; leave this alone
 Mesh mubiao;   // global target
+Mesh lieren;
 
 // helper function: makes a random vector
 Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
@@ -76,9 +77,7 @@ struct Target {
 
   Target() {
     position = r() * initialRadius;
-    velocity = Vec3f(0, 0, 0);
-    acceleration = Vec3f(0, 0, 0);
-    Color c = HSV(1, 1, 1);
+    Color c = RGB(0, 1, 0);
   }
 
   void draw(Graphics &g) {
@@ -86,6 +85,21 @@ struct Target {
     g.translate(position);
     g.color(c);
     g.draw(mubiao);
+    g.popMatrix();
+  }
+};
+
+struct Predator : Target {
+  Predator() {
+    position = r() * initialRadius;
+    Color c = RGB(1, 0, 0);
+  }
+
+  void draw(Graphics &g) {
+    g.pushMatrix();
+    g.translate(position);
+    g.color(c);
+    g.draw(lieren);
     g.popMatrix();
   }
 };
@@ -102,9 +116,9 @@ struct MyApp : App {
 
   // creating the real particleList, it's now empty
   vector<Particle> particles;
-  vector<Vec3f> particlePositions;
 
   Target mubiaoOne;
+  Predator lierenOne;
 
   MyApp() {
     addCone(yuanqiu, sphereRadius, Vec3f(0, 0, sphereRadius * 3), 16, 1);
@@ -112,6 +126,9 @@ struct MyApp : App {
 
     addSphere(mubiao, sphereRadius, 16);
     mubiao.generateNormals();
+
+    addSphere(lieren, sphereRadius * 2, 16);
+    lieren.generateNormals();
 
     light.pos(0, 10, 10);  // place the light
     nav().pos(0, 0, 30);   // place the viewer
@@ -138,20 +155,14 @@ struct MyApp : App {
     // Target animation
     mubiaoOne.position = appState.targetPosition;
 
+    // Predator animation
+    lierenOne.position = appState.predatorPosition;
+
     // Particle animation
     for (int i = 0; i < particles.size(); ++i) {
-      // particlePositions[i] = Vec3f(appState.parPositions.stuff[i].x,
-      //                              appState.parPositions.stuff[i].y,
-      //                              appState.parPositions.stuff[i].z);
-
       particles[i].pose.pos().x = appState.parPositions.stuff[i].x;
       particles[i].pose.pos().y = appState.parPositions.stuff[i].y;
       particles[i].pose.pos().z = appState.parPositions.stuff[i].z;
-
-      // appState.parPositions.stuff[i].y,
-      // appState.parPositions.stuff[i].z)
-      //  << endl;
-      // particles[i].position = particlePositions[i];
     }
 
     // nav().faceToward(mubiaoOne.position);
@@ -165,6 +176,7 @@ struct MyApp : App {
       par.draw(g);
     }
     mubiaoOne.draw(g);
+    lierenOne.draw(g);
   }
 };
 

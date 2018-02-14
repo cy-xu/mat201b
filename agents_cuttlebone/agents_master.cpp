@@ -24,7 +24,7 @@ using namespace std;
 // change them however you like, but make a note of these settings.
 unsigned particleCount = 300;  // try 2, 5, 50, and 5000
 double maxAcceleration = 300;  // prevents explosion, loss of particles
-double maxSpeed = 50;          // mock number
+double maxSpeed = 100;         // mock number
 double initialRadius = 50;     // initial condition
 double initialSpeed = 300;     // initial condition
 double timeStep = 0.01;        // keys change this value for effect
@@ -34,6 +34,7 @@ float steerFactor = -1e1;      // Seperation steer constant
 
 Mesh yuanqiu;  // global prototype; leave this alone
 Mesh mubiao;   // global target
+Mesh lieren;
 
 // helper function: makes a random vector
 Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
@@ -53,9 +54,10 @@ struct Particle {
   Particle(vector<Particle> *p) {
     pose.pos() = r() * initialRadius * 2;
     // this will tend to spin stuff around the y axis
-    velocity = Vec3f(0, 100, 0).cross(pose.pos()).normalize(initialSpeed);
-    acceleration = Vec3f(rnd::uniform(), rnd::uniform(), rnd::uniform());
+    velocity = Vec3f(0, 200, 0).cross(pose.pos()).normalize(initialSpeed);
+    // acceleration = Vec3f(rnd::uniform(), rnd::uniform(), rnd::uniform());
     // acceleration = r() * initialSpeed;
+    acceleration = Vec3f(0, 0, 0);
     c = HSV(rnd::uniform(), 1, 1);
     // pointing the *p to *particles so we can access the actual vector
     // via *p, by accessing *particles
@@ -72,9 +74,9 @@ struct Particle {
     // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
     // 1.0 , 1.0 , 1.0 is an interesting stable combination
 
-    sep = sep * 5.0f;
+    sep = sep * 6.0f;
     ali = ali * 1.f;
-    coh = coh * 1.5f;
+    coh = coh * 1.f;
 
     applyForce(sep);
     applyForce(ali);
@@ -133,7 +135,7 @@ struct Particle {
     for (auto other : *particles) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 12 * sphereRadius) {
+      if (d > 0 && d < 20 * sphereRadius) {
         sum += other.acceleration;
         count++;
       }
@@ -155,7 +157,7 @@ struct Particle {
     for (auto other : *particles) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 12 * sphereRadius) {
+      if (d > 0 && d < 10 * sphereRadius) {
         sum += other.pose.pos();
         count++;
       }
@@ -179,7 +181,14 @@ struct Particle {
   void seekTarget(Vec3f target) {
     Vec3f desired = target - pose.pos();
     Vec3f steer = desired - velocity;
-    steer.normalize(maxSpeed * 5);
+    steer.normalize(maxSpeed * 1);
+    applyForce(steer);
+  }
+
+  void runAway(Vec3f target) {
+    Vec3f desired = target - pose.pos();
+    Vec3f steer = -(desired - velocity);
+    steer.normalize(maxSpeed * 6);
     applyForce(steer);
   }
 };
@@ -187,28 +196,18 @@ struct Particle {
 // Target
 /////////////////////////////
 struct Target {
-  Vec3f position, velocity, acceleration, desired, steer;
+  Vec3f position;
   Color c;
   double lifetime = 0, i = 0;
 
   Target() {
     position = r() * initialRadius;
-    velocity = Vec3f(0, 0, 0);
-    acceleration = Vec3f(0, 0, 0);
-    Color c = HSV(1, 1, 1);
+    Color c = RGB(0, 1, 0);
   }
-
-  void update() {
-    velocity += acceleration * timeStep;
-    position += velocity * timeStep;
-    // acceleration.zero();
-  }
-
-  void applyForce(Vec3f force) { acceleration += force; }
 
   void run(double dt) {
     lifetime += dt;
-    position += Vec3f(sin(M_PI * i), cos(M_PI * i), sin(M_PI * i * 2) * 2);
+    position += Vec3f(sin(M_PI * i) * 2, cos(M_PI * i), sin(M_PI * i * 2) * 2);
     i += 0.002;
     position.normalize(initialRadius * 1.5);
   }
@@ -222,6 +221,28 @@ struct Target {
   }
 };
 
+struct Predator : Target {
+  Predator() {
+    position = r() * initialRadius;
+    Color c = RGB(1, 0, 0);
+  }
+  float i = 2;
+  void run(double dt) {
+    lifetime += dt;
+    position += Vec3f(cos(M_PI * i), sin(M_PI * i), cos(M_PI * i) * 2);
+    i += 0.003;
+    position.normalize(initialRadius * 1.3);
+  }
+
+  void draw(Graphics &g) {
+    g.pushMatrix();
+    g.translate(position);
+    g.color(c);
+    g.draw(lieren);
+    g.popMatrix();
+  }
+};
+
 // Audio
 /////////////////////////////
 
@@ -229,7 +250,6 @@ struct Target {
 /////////////////////////////
 struct MyApp : App {
   Material material;
-  // material.shininess(1.0);
   Light light;
   bool simulate = true;
 
@@ -243,15 +263,17 @@ struct MyApp : App {
   // vector<Vec3f> particleColors;
 
   Target mubiaoOne;
+  Predator lierenOne;
 
   MyApp() : maker("127.0.0.1") {
     addCone(yuanqiu, sphereRadius, Vec3f(0, 0, sphereRadius * 3), 16, 1);
     yuanqiu.generateNormals();
 
     addSphere(mubiao, sphereRadius, 16);
-    // addWireBox(mubiao, 10, 10, 10);
-    // addCube(mubiao, false, 10);
     mubiao.generateNormals();
+
+    addSphere(lieren, sphereRadius * 2, 16);
+    lieren.generateNormals();
 
     light.pos(0, 10, 10);  // place the light
     // light.diffuse();
@@ -281,42 +303,45 @@ struct MyApp : App {
 
     // Target animation
     mubiaoOne.run(dt);
-    mubiaoOne.update();
-    /*
-    if (mubiaoOne.lifetime > 10) {
-      mubiaoOne.position = r() * initialRadius;
-      mubiaoOne.run(dt);
-      mubiaoOne.update();
-      mubiaoOne.lifetime = 0;
-      cout << "New Target generated." << endl;
-    }
-    */
     // send target position
     appState.targetPosition = mubiaoOne.position;
+
+    // Predator animation
+    lierenOne.run(dt);
+    // send Predator position
+    appState.predatorPosition = lierenOne.position;
 
     // Particle animation
     for (int i = 0; i < particleList.size(); ++i) {
       particleList[i].update();
+      particleList[i].pose.faceToward(mubiaoOne.position);
+      particlePositions[i] = particleList[i].pose.pos();
+
       // only sense target nearby
       Vec3f difference = particleList[i].pose.pos() - mubiaoOne.position;
       float d = difference.mag();
-      if (d < 40 * sphereRadius) {
+      if (d < 50 * sphereRadius) {
         particleList[i].seekTarget(Vec3d(mubiaoOne.position));
       }
-      particleList[i].pose.faceToward(mubiaoOne.position);
-      particlePositions[i] = particleList[i].pose.pos();
+
+      // run away from predator
+      Vec3f difference2 = particleList[i].pose.pos() - lierenOne.position;
+      float d2 = difference2.mag();
+      if (d2 < 20 * sphereRadius) {
+        particleList[i].runAway(lierenOne.position);
+      }
     }
     // send all particle position
     appState.parPositions.fill_stuff(particlePositions);
 
     // limiting paritcle acceleration
-    unsigned limitCount = 0;
-    for (int i = 0; i < particleList.size(); ++i) {
-      if (particleList[i].acceleration.mag() > maxAcceleration) {
-        particleList[i].acceleration.normalize(maxAcceleration);
-        limitCount++;
-      }
-    }
+    // unsigned limitCount = 0;
+    // for (int i = 0; i < particleList.size(); ++i) {
+    //   if (particleList[i].acceleration.mag() > maxAcceleration) {
+    //     particleList[i].acceleration.normalize(maxAcceleration);
+    //     limitCount++;
+    //   }
+    // }
     // printf("%u of %lu limited\n", limitCount, particleList.size());
 
     // send data to common
@@ -333,6 +358,7 @@ struct MyApp : App {
       par.draw(g);
     }
     mubiaoOne.draw(g);
+    lierenOne.draw(g);
   }
 
   void onKeyDown(const ViewpointWindow &, const Keyboard &k) {

@@ -40,6 +40,7 @@ struct FakeVector {
 struct State {
   FakeVector parPositions;
   Vec3f targetPosition;
+  Vec3f predatorPosition;
   // FakeVector colors;
   // vector<Color> particleColors;
   // vector<Pose> particlePoses;
