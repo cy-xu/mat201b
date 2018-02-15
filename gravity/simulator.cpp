@@ -13,10 +13,10 @@ MIT License (details omitted)
 
 #include "Cuttlebone/Cuttlebone.hpp"
 #include "Gamma/Oscillator.h"
-#include "agents_common.hpp"
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Ray.hpp"
 #include "allocore/math/al_Vec.hpp"
+#include "common.hpp"
 
 using namespace al;
 using namespace std;
