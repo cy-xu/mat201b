@@ -12,6 +12,7 @@ MIT License (details omitted)
 // struct myApp (clan, targetGroup)
 
 #include "Cuttlebone/Cuttlebone.hpp"
+#include "Gamma/Oscillator.h"
 #include "agents_common.hpp"
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Ray.hpp"
@@ -34,7 +35,12 @@ float steerFactor = -1e1;      // Seperation steer constant
 
 Mesh yuanqiu;  // global prototype; leave this alone
 Mesh mubiao;   // global target
-Mesh lieren;
+Mesh lieren;   // global predator
+
+// global variables for sound
+float targetToNav;
+float parNearTarget;
+float myFrameRate;
 
 // helper function: makes a random vector
 Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
@@ -266,6 +272,10 @@ struct MyApp : App {
   Target mubiaoOne;
   Predator lierenOne;
 
+  // for sound
+  gam::SineD<> sined;
+  gam::Accum<> timer;
+
   MyApp() : maker("127.0.0.1") {
     addCone(yuanqiu, sphereRadius, Vec3f(0, 0, sphereRadius * 3), 16, 1);
     yuanqiu.generateNormals();
@@ -291,10 +301,17 @@ struct MyApp : App {
     }
 
     initWindow();
+    // timer.freq(2.0f);
+    // sined.set(rnd::uniform(220.0f, 880.0f), 0.5f, 1.0f);
     initAudio();
   }
 
   void onAnimate(double dt) {
+    // reset two variable for sound
+    parNearTarget = 0;
+    myFrameRate = 1 / dt;
+    cout << "Current Frame Rate: " << myFrameRate << endl;
+
     if (!simulate)
       // skip the rest of this function
       return;
@@ -319,15 +336,19 @@ struct MyApp : App {
       particlePositions[i] = particleList[i].pose.pos();
 
       // only sense target nearby
-      Vec3f difference = particleList[i].pose.pos() - mubiaoOne.position;
-      float d = difference.mag();
+      Vec3f diff_target = particleList[i].pose.pos() - mubiaoOne.position;
+      float d = diff_target.mag();
       if (d < 50 * sphereRadius) {
+        // if (d < 20 * sphereRadius) {
+        parNearTarget += 1;
+        // }
         particleList[i].seekTarget(Vec3d(mubiaoOne.position));
       }
+      appState.parNearTargetTemp = parNearTarget / 20;
 
       // run away from predator
-      Vec3f difference2 = particleList[i].pose.pos() - lierenOne.position;
-      float d2 = difference2.mag();
+      Vec3f diff_predator = particleList[i].pose.pos() - lierenOne.position;
+      float d2 = diff_predator.mag();
       if (d2 < 20 * sphereRadius) {
         particleList[i].runAway(lierenOne.position);
       }
@@ -349,6 +370,11 @@ struct MyApp : App {
     maker.set(appState);
 
     // nav().faceToward(mubiaoOne.position);
+
+    // how close is the target to viewer
+    Vec3f diff_nav = nav().pos() - mubiaoOne.position;
+    targetToNav = diff_nav.mag();  // it ranges from 50 - 100
+    timer.freq(appState.parNearTargetTemp);
   }
 
   void onDraw(Graphics &g) {
@@ -394,6 +420,19 @@ struct MyApp : App {
         // pause the simulation
         //   simulate = !simulate;
         break;
+    }
+  }
+
+  virtual void onSound(AudioIOData &io) {
+    gam::Sync::master().spu(audioIO().fps());
+    while (io()) {
+      if (timer()) {
+        // sined.set(rnd::uniform(220.0f, 880.0f), 0.5f, 1.0f);
+        sined.set(1000.0f - targetToNav * 6, 0.5f, 1.0f);
+      }
+      float s = sined();
+      io.out(0) = s;
+      io.out(1) = s;
     }
   }
 };

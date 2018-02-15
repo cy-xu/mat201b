@@ -23,24 +23,13 @@ struct FakeVector {
   }
 };
 
-// int main() {
-//   vector<Vec3f> v;
-//   for (unsigned i = 0; i < 1000; ++i)
-//     v.push_back(Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()));
-//   FakeVector state;
-//   state.fill_stuff(v);
-
-//   for (unsigned i = 0; i < state.n; ++i) {
-//     printf("%f == %f\n", v[i].x, state.stuff[i].x);
-//   }
-// }
-
 // Common definition of application state
 //
 struct State {
   FakeVector parPositions;
   Vec3f targetPosition;
   Vec3f predatorPosition;
+  float parNearTargetTemp;
   // FakeVector colors;
   // vector<Color> particleColors;
   // vector<Pose> particlePoses;

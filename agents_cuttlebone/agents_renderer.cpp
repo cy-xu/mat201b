@@ -12,6 +12,7 @@ MIT License (details omitted)
 // struct myApp (clan, targetGroup)
 
 #include "Cuttlebone/Cuttlebone.hpp"
+#include "Gamma/Oscillator.h"
 #include "agents_common.hpp"
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Ray.hpp"
@@ -35,6 +36,11 @@ float steerFactor = -1e1;      // Seperation steer constant
 Mesh yuanqiu;  // global prototype; leave this alone
 Mesh mubiao;   // global target
 Mesh lieren;
+
+// global variables for sound
+float targetToNav;
+float parNearTarget;
+float myFrameRate;
 
 // helper function: makes a random vector
 Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
@@ -120,6 +126,10 @@ struct MyApp : App {
   Target mubiaoOne;
   Predator lierenOne;
 
+  // for sound
+  gam::SineD<> sined;
+  gam::Accum<> timer;
+
   MyApp() {
     addCone(yuanqiu, sphereRadius, Vec3f(0, 0, sphereRadius * 3), 16, 1);
     yuanqiu.generateNormals();
@@ -146,6 +156,11 @@ struct MyApp : App {
   }
 
   void onAnimate(double dt) {
+    // reset two variable for sound
+    parNearTarget = 0;
+    myFrameRate = 1 / dt;
+    cout << "Current Frame Rate: " << myFrameRate << endl;
+
     // get data from common
     taker.get(appState);
 
@@ -167,6 +182,11 @@ struct MyApp : App {
     }
 
     // nav().faceToward(mubiaoOne.position);
+
+    // how close is the target to viewer
+    Vec3f diff_nav = nav().pos() - mubiaoOne.position;
+    targetToNav = diff_nav.mag();  // it ranges from 50 - 100
+    timer.freq(appState.parNearTargetTemp);
   }
 
   void onDraw(Graphics &g) {
@@ -178,6 +198,19 @@ struct MyApp : App {
     }
     mubiaoOne.draw(g);
     lierenOne.draw(g);
+  }
+
+  virtual void onSound(AudioIOData &io) {
+    gam::Sync::master().spu(audioIO().fps());
+    while (io()) {
+      if (timer()) {
+        // sined.set(rnd::uniform(220.0f, 880.0f), 0.5f, 1.0f);
+        sined.set(1000.0f - targetToNav * 6, 0.5f, 1.0f);
+      }
+      float s = sined();
+      io.out(0) = s;
+      io.out(1) = s;
+    }
   }
 };
 
