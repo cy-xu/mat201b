@@ -1,5 +1,9 @@
-This is my work for MAT 201B, Winter 2018.
+MAT 201B, Winter 2018.
 
-README.md is this file
-playground/ is a bunch of random programs is make to learn
-color_spaces/ is my first homework
+color_spaces/ is homework one.
+agents/ is homework two.
+gravity/ contains both homework three and four.
+playground/ is a bunch of random programs
+
+CY Xu
+Feb 2018
