@@ -48,7 +48,7 @@ Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
 Vec3f circle() {
   return Vec3f(
       initRadius * sin(rnd::uniformS(2 * M_PI)) * cos(rnd::uniformS(2 * M_PI)),
-      initRadius * sin(rnd::uniformS(M_PI)) * sin(rnd::uniformS(M_PI)),
+      initRadius * sin(rnd::uniformS(2 * M_PI)) * sin(rnd::uniformS(2 * M_PI)),
       initRadius * cos(rnd::uniformS(2 * M_PI)));
 }
 
@@ -82,7 +82,7 @@ struct Fish {
 
   void update() {
     if (alive == false) {
-      pose.pos() = Vec3f(100, 100, 100);
+      pose.pos() = Vec3f(0, 0, 10000);
     } else {
       // since *particles is inside class, no need to bring into the
       // functions.
@@ -94,10 +94,10 @@ struct Fish {
       // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
       // 1.0 , 1.0 , 1.0 is an interesting stable combination
 
-      sep = sep * 6.0f;
-      ali = ali * 1.f;
-      coh = coh * 1.f;
-      stay = stay * 5.f;
+      sep = sep * 1.5f;
+      ali = ali * 2.0f;
+      coh = coh * 1.0f;
+      stay = stay * 1.0f;
 
       applyForce(sep);
       applyForce(ali);
@@ -154,7 +154,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 50 * sphereRadius) {
+      if (d > 0 && d < 100 * sphereRadius) {
         sum += other.acceleration;
         count++;
       }
@@ -176,7 +176,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 10 * sphereRadius) {
+      if (d > 0 && d < 100 * sphereRadius) {
         sum += other.pose.pos();
         count++;
       }
@@ -207,8 +207,8 @@ struct Fish {
 
   void runAway(Vec3f target) {
     Vec3f desired = target - pose.pos();
-    Vec3f steer = -(desired - velocity);
-    steer = steer.normalize() * maxSpeed * 0.005;
+    Vec3f steer = -(desired.normalize() * maxSpeed);
+    steer = (steer - velocity) * 3;
     applyForce(steer);
   }
 
@@ -217,7 +217,7 @@ struct Fish {
     if (d > OUT_BOUND) {
       return seek(Vec3f(0, 0, 0));
     } else
-      return 0;
+      return seek(Vec3f(velocity.x, rnd::uniformS(initRadius * 2), velocity.z));
   }
 
   void applyForce(Vec3f force) { acceleration += force; }
@@ -273,7 +273,7 @@ struct UserFish {
         targetPos = fish.pose.pos();
       }
     }
-    nav.quat().slerpTo(targetQuat, 0.1);
+    nav.quat().slerpTo(targetQuat, 0.06);
 
     Vec3f desired = targetPos - nav.pos();
     Vec3f steer = desired.normalize() * maxAcceleration;
@@ -310,7 +310,7 @@ struct MyApp : App {
 
     light.pos(0, 10, 10);  // place the light
     // light.diffuse();
-    nav().pos(0, 0, 60);  // place the viewer
+    nav().pos(0, 0, 50);  // place the viewer
     lens().far(400);      // set the far clipping plane
     background(Color(0.1));
 
@@ -354,7 +354,7 @@ struct MyApp : App {
         nearbyFish += 1;
         // fishZeroList[i].seekTarget(userFishZero.nav.pos());
       }
-      if (d2 < 20 * sphereRadius) {
+      if (d2 < 60 * sphereRadius) {
         fishZeroList[i].runAway(userFishZero.nav.pos());
       }
       if (d2 < 5 * sphereRadius) {
