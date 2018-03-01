@@ -22,21 +22,18 @@ using namespace al;
 using namespace std;
 
 #define TAIL_LENGTH 20
+#define OUT_BOUND 200
 
 // some of these must be carefully balanced; i spent some time turning them.
 // change them however you like, but make a note of these settings.
 unsigned fishCount = 300;      // try 2, 5, 50, and 5000
 double maxAcceleration = 300;  // prevents explosion, loss of particles
 double maxSpeed = 100;         // mock number
-double initialRadius = 50;     // initial condition
-double initialSpeed = 100;     // initial condition
+double initRadius = 50;        // initial condition
+double initSpeed = 100;        // initial condition
 double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
-
-Mesh yuanqiu;  // global prototype; leave this alone
-Mesh mubiao;   // global target
-Mesh lieren;   // global predator
 
 Mesh fishMesh;
 Mesh userFishMesh;
@@ -48,152 +45,21 @@ float myFrameRate;
 
 // helper function: makes a random vector
 Vec3f r() { return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()); }
+Vec3f circle() {
+  return Vec3f(
+      initRadius * sin(rnd::uniformS(2 * M_PI)) * cos(rnd::uniformS(2 * M_PI)),
+      initRadius * sin(rnd::uniformS(M_PI)) * sin(rnd::uniformS(M_PI)),
+      initRadius * cos(rnd::uniformS(2 * M_PI)));
+}
 
-// All Marine Creature
-struct MarineCreature {
+// NormalFish
+struct Fish {
   float lifespan, mass;
   Vec3f velocity, acceleration;
   Pose pose, target;
   Color color;
   bool alive;
 
-  // *particles is the pointer to the actual particleList
-  vector<MarineCreature> *marineCreatures;
-
-  MarineCreature() {}
-
-  // using *p here because we don't want to copy the actual particleList every
-  // time creating an instance, so using a pointer here
-  MarineCreature(vector<MarineCreature> *p) {
-    pose.pos() = r() * initialRadius * 2;
-    velocity = Vec3f(0, 200, 0).cross(pose.pos()).normalize(initialSpeed);
-    acceleration = r() * initialSpeed;
-    // acceleration = Vec3f(0, 0, 0);
-    color = HSV(rnd::uniform(), 1, 1);
-    // pointing the *p to *particles so we can access the actual vector
-    // via *p, by accessing *particles
-    marineCreatures = p;
-  }
-
-  void update() {
-    // since *particles is inside class, no need to bring into the
-    // functions.
-    Vec3f sep = separate();
-    Vec3f ali = align();
-    Vec3f coh = cohesion();
-
-    // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
-    // 1.0 , 1.0 , 1.0 is an interesting stable combination
-
-    sep = sep * 6.0f;
-    ali = ali * 1.f;
-    coh = coh * 1.f;
-
-    applyForce(sep);
-    applyForce(ali);
-    applyForce(coh);
-
-    velocity += acceleration * timeStep;
-    pose.pos() += velocity * timeStep;
-
-    acceleration.zero();  // reset acceleration after each update
-  }
-
-  void applyForce(Vec3f force) { acceleration += force; }
-
-  Vec3f separate() {
-    int count = 0;
-    Vec3f steer;
-
-    for (auto other : *marineCreatures) {
-      // this difference is a vector from b to a, put this force on a, so
-      // push away.
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      // if agents is getting closer, push away
-      if (d > 0 && d < 6 * sphereRadius) {
-        steer += difference.normalize() / d;
-        count++;
-      }
-    }
-    if (count > 0) {
-      steer = steer / count;
-    }
-    if (steer.mag() > 0) {
-      steer.normalize(maxSpeed);
-      steer -= velocity;
-    }
-    return steer;
-  }
-
-  Vec3f align() {
-    int count = 0;
-    Vec3f steer;
-    Vec3f sum;
-
-    for (auto other : *marineCreatures) {
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      if (d > 0 && d < 20 * sphereRadius) {
-        sum += other.acceleration;
-        count++;
-      }
-    }
-    if (count > 0) {
-      sum = sum / count;
-      sum.normalize(maxSpeed);
-      steer = sum - velocity;
-      return steer;
-    } else {
-      return Vec3f(0, 0, 0);
-    }
-  }
-
-  Vec3f cohesion() {
-    int count = 0;
-    Vec3f sum;
-
-    for (auto other : *marineCreatures) {
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      if (d > 0 && d < 10 * sphereRadius) {
-        sum += other.pose.pos();
-        count++;
-      }
-    }
-    if (count > 0) {
-      sum = sum / count;
-      sum.normalize(maxSpeed);
-      return seek(sum);
-    } else {
-      return Vec3f(0, 0, 0);
-    }
-  }
-
-  Vec3f seek(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    desired.normalize(maxSpeed);
-    Vec3f steer = desired - velocity;
-    return steer;
-  }
-
-  void seekTarget(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    Vec3f steer = desired - velocity;
-    steer.normalize(maxSpeed * 1);
-    applyForce(steer);
-  }
-
-  void runAway(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    Vec3f steer = -(desired - velocity);
-    steer = steer.normalize() * maxSpeed * 0.005;
-    applyForce(steer);
-  }
-};
-
-// NormalFish
-struct Fish : MarineCreature {
   // *particles is the pointer to the actual particleList
   vector<Fish> *fishes;
 
@@ -202,15 +68,57 @@ struct Fish : MarineCreature {
   // using *p here because we don't want to copy the actual particleList every
   // time creating an instance, so using a pointer here
   Fish(vector<Fish> *f) {
-    pose.pos() = r() * initialRadius;
-    velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initialSpeed);
-    acceleration = r() * initialSpeed;
+    pose.pos() = circle();
+    // velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initSpeed);
+    velocity = Vec3f(0, 0, 0);
+    acceleration = r() * initSpeed;
     // acceleration = Vec3f(0, 0, 0);
     color = HSV(rnd::uniform(), 1, 1);
     // pointing the *p to *particles so we can access the actual vector
     // via *p, by accessing *particles
     fishes = f;
     alive = true;
+  }
+
+  void update() {
+    if (alive == false) {
+      pose.pos() = Vec3f(100, 100, 100);
+    } else {
+      // since *particles is inside class, no need to bring into the
+      // functions.
+      Vec3f sep = separate();
+      Vec3f ali = align();
+      Vec3f coh = cohesion();
+      Vec3f stay = stayInCircle();
+
+      // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
+      // 1.0 , 1.0 , 1.0 is an interesting stable combination
+
+      sep = sep * 6.0f;
+      ali = ali * 1.f;
+      coh = coh * 1.f;
+      stay = stay * 5.f;
+
+      applyForce(sep);
+      applyForce(ali);
+      applyForce(coh);
+      applyForce(stay);
+
+      velocity += acceleration * timeStep;
+      pose.pos() += velocity * timeStep;
+
+      acceleration.zero();  // reset acceleration after each update
+    }
+  }
+
+  void draw(Graphics &g) {
+    g.pushMatrix();
+    g.translate(pose.pos());
+    // g.rotate(pose.quat().inverse());
+    g.rotate(pose.quat());
+    g.color(color);
+    g.draw(fishMesh);
+    g.popMatrix();
   }
 
   Vec3f separate() {
@@ -232,7 +140,7 @@ struct Fish : MarineCreature {
       steer = steer / count;
     }
     if (steer.mag() > 0) {
-      steer.normalize(maxSpeed);
+      steer = steer.normalize() * maxSpeed;
       steer -= velocity;
     }
     return steer;
@@ -282,46 +190,37 @@ struct Fish : MarineCreature {
     }
   }
 
-  void draw(Graphics &g) {
-    g.pushMatrix();
-    g.translate(pose.pos());
-    // g.rotate(pose.quat().inverse());
-    g.rotate(pose.quat());
-    g.color(color);
-    g.draw(fishMesh);
-    g.popMatrix();
+  Vec3f seek(Vec3f target) {
+    Vec3f desired = target - pose.pos();
+    Vec3f steer = desired.normalize(maxSpeed);
+    steer -= velocity;
+    return steer;
   }
 
   void eaten() { alive = false; }
 
-  void update() {
-    if (alive == false) {
-      pose.pos() = Vec3f(100, 100, 100);
-    } else {
-      // since *particles is inside class, no need to bring into the
-      // functions.
-      Vec3f sep = separate();
-      Vec3f ali = align();
-      Vec3f coh = cohesion();
-
-      // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
-      // 1.0 , 1.0 , 1.0 is an interesting stable combination
-
-      sep = sep * 6.0f;
-      ali = ali * 1.f;
-      coh = coh * 1.f;
-
-      applyForce(sep);
-      applyForce(ali);
-      applyForce(coh);
-
-      velocity += acceleration * timeStep;
-      pose.pos() += velocity * timeStep;
-      cohesion();
-
-      acceleration.zero();  // reset acceleration after each update
-    }
+  void seekTarget(Vec3f target) {
+    Vec3f steer = seek(target).normalize();
+    steer = steer * maxAcceleration;
+    applyForce(steer);
   }
+
+  void runAway(Vec3f target) {
+    Vec3f desired = target - pose.pos();
+    Vec3f steer = -(desired - velocity);
+    steer = steer.normalize() * maxSpeed * 0.005;
+    applyForce(steer);
+  }
+
+  Vec3f stayInCircle() {
+    float d = pose.pos().mag();
+    if (d > OUT_BOUND) {
+      return seek(Vec3f(0, 0, 0));
+    } else
+      return 0;
+  }
+
+  void applyForce(Vec3f force) { acceleration += force; }
 };
 
 // UserFish
@@ -333,7 +232,7 @@ struct UserFish {
   int idx;
 
   UserFish() {
-    nav.pos() = Vec3f(0, 0, 0) * initialRadius * 2;
+    nav.pos() = Vec3f(0, 0, 0) * initRadius * 2;
     velocity = Vec3f(0, 0, 0);
     velocity = Vec3f(0, 0, 0);
     color = RGB(1);
@@ -357,29 +256,6 @@ struct UserFish {
   }
 
   void update() {
-    // remember previous position and step nav
-    lastPos.set(nav.pos());
-    // nav.step(dt);
-
-    // animate tail
-    int size = tentacles.vertices().size();
-    if ((nav.pos() - lastPos).mag() > 5)
-      // dont draw line segment if position was wraped
-      tentacles.vertices()[idx] = nav.pos();
-    else
-      tentacles.vertices()[idx] = lastPos;
-    idx = wrap(idx + 1, size, 0);
-    tentacles.vertices()[idx] = nav.pos();
-    idx = wrap(idx + 1, size, 0);
-
-    // set tail colors to fade older segments out
-    int c = idx - 1;
-    c = wrap(c, size, 0);
-    for (int i = 0; i < size; i++) {
-      tentacles.colors()[c--] = RGB((size - i) / (float)size);
-      c = wrap(c, size, 0);
-    }
-
     velocity += acceleration * timeStep;
     nav.pos() += velocity * timeStep;
     acceleration.zero();  // reset acceleration after each update
@@ -390,21 +266,18 @@ struct UserFish {
     Vec3f targetPos;
     float nearestFish = 10000;
     for (auto fish : fishes) {
-      Vec3f difference = (nav.pos() - fish.pose.pos());
-      float d = difference.mag();
+      float d = (nav.pos() - fish.pose.pos()).mag();
       if (d < nearestFish) {
         nearestFish = d;
         targetQuat = fish.pose.quat();
         targetPos = fish.pose.pos();
       }
     }
-    cout << "current nearest Fish " << nearestFish << endl;
-    nav.quat().slerpTo(targetQuat, 0.01);
-    // nav.move(targetPos);
+    nav.quat().slerpTo(targetQuat, 0.1);
 
     Vec3f desired = targetPos - nav.pos();
-    Vec3f steer = desired - velocity;
-    steer = steer.normalize() * maxSpeed * 10;
+    Vec3f steer = desired.normalize() * maxAcceleration;
+    steer = steer - velocity;
     applyForce(steer);
   }
 
@@ -437,9 +310,9 @@ struct MyApp : App {
 
     light.pos(0, 10, 10);  // place the light
     // light.diffuse();
-    nav().pos(0, 0, 30);  // place the viewer
+    nav().pos(0, 0, 60);  // place the viewer
     lens().far(400);      // set the far clipping plane
-    background(Color(0.07));
+    background(Color(0.1));
 
     // pushing every Particle instance into the actual list
     for (int i = 0; i < fishCount; i++) {
@@ -479,7 +352,7 @@ struct MyApp : App {
 
       if (d2 < 50 * sphereRadius) {
         nearbyFish += 1;
-        // particleList[i].seekTarget(Vec3d(mubiaoOne.position));
+        // fishZeroList[i].seekTarget(userFishZero.nav.pos());
       }
       if (d2 < 20 * sphereRadius) {
         fishZeroList[i].runAway(userFishZero.nav.pos());
