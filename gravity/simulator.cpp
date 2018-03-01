@@ -276,7 +276,7 @@ struct MyApp : App {
   gam::SineD<> sined;
   gam::Accum<> timer;
 
-  MyApp() : maker("127.0.0.1") {
+  MyApp() : maker("255.255.255.255") {
     addCone(yuanqiu, sphereRadius, Vec3f(0, 0, sphereRadius * 3), 16, 1);
     yuanqiu.generateNormals();
 
