@@ -120,7 +120,7 @@ struct MarineCreature {
       steer = steer / count;
     }
     if (steer.mag() > 0) {
-      steer.normalize() * maxAcceleration;
+      steer.normalize(maxSpeed);
       steer -= velocity;
     }
     return steer;
@@ -398,7 +398,7 @@ struct UserFish {
         targetPos = fish.pose.pos();
       }
     }
-    // cout << "current nearest Fish " << nearestFish << endl;
+    cout << "current nearest Fish " << nearestFish << endl;
     nav.quat().slerpTo(targetQuat, 0.01);
     // nav.move(targetPos);
 
