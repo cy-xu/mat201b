@@ -97,7 +97,7 @@ struct Fish {
       sep = sep * 1.5f;
       ali = ali * 2.0f;
       coh = coh * 1.0f;
-      stay = stay * 1.0f;
+      stay = stay * 5.0f;
 
       applyForce(sep);
       applyForce(ali);
@@ -217,7 +217,9 @@ struct Fish {
     if (d > OUT_BOUND) {
       return seek(Vec3f(0, 0, 0));
     } else
-      return seek(Vec3f(velocity.x, rnd::uniformS(initRadius * 2), velocity.z));
+      return seek(Vec3f(pose.pos().x + 10 * velocity.x,
+                        rnd::uniform(initRadius),
+                        pose.pos().z + 10 * velocity.z));
   }
 
   void applyForce(Vec3f force) { acceleration += force; }
