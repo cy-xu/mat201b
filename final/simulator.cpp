@@ -40,6 +40,7 @@ double initSpeed = 100;        // initial condition
 double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
+int targetPlanktonID;
 
 // global variables for sound
 float targetToNav;
@@ -80,11 +81,9 @@ struct Plankton {
   // time creating an instance, so using a pointer here
   Plankton(vector<Plankton> *p) {
     pose.pos() = circle() * 10;
-    // velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initSpeed);
     velocity = Vec3f(0, 0, 0);
-    acceleration = r() * initSpeed;
-    // acceleration = Vec3f(0, 0, 0);
-    color = RGB(255);
+    acceleration = Vec3f(0, 0, 0);
+    color = RGB(150);
     // pointing the *p to *particles so we can access the actual vector
     // via *p, by accessing *particles
     planktons = p;
@@ -98,21 +97,12 @@ struct Plankton {
       // since *particles is inside class, no need to bring into the
       // functions.
       Vec3f sep = separate();
-      // Vec3f ali = align();
-      // Vec3f coh = cohesion();
       Vec3f stay = stayInCircle();
 
-      // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
-      // 1.0 , 1.0 , 1.0 is an interesting stable combination
-
       sep = sep * 1.5f;
-      // ali = ali * 2.0f;
-      // coh = coh * 1.0f;
-      stay = stay * 1.0f;
+      stay = stay * 0.1f;
 
       applyForce(sep);
-      // applyForce(ali);
-      // applyForce(coh);
       applyForce(stay);
 
       velocity += acceleration * timeStep;
@@ -166,31 +156,14 @@ struct Plankton {
 
   void eaten() { alive = false; }
 
-  void runAway(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    Vec3f steer = -(desired.normalize() * maxSpeed);
-    steer = (steer - velocity) * 1;
-    applyForce(steer);
-  }
-
-  Vec3f stayInCircle() {
-    float d = pose.pos().mag() / 10;
-    cout << "plankton d is " << d << endl;
-    if (d > OUT_BOUND) {
-      return seek(Vec3f(0, 0, 0));
-    } else
-      // return seek(Vec3f(pose.pos().x + 10 * velocity.x,
-      //                   rnd::uniform(initRadius),
-      //                   pose.pos().z + 10 * velocity.z));
-      return seek(rnd::ball<Vec3f>() * 3 * initRadius);
-  }
+  Vec3f stayInCircle() { return seek(rnd::ball<Vec3f>() * 50 * initRadius); }
 
   void applyForce(Vec3f force) { acceleration += force; }
 };
 
 // NormalFish
 struct Fish {
-  float lifespan, mass;
+  float lifespan, mass, targetPlankton = 10000;
   Vec3f velocity, acceleration;
   Pose pose, target;
   Color color;
@@ -206,10 +179,10 @@ struct Fish {
   // time creating an instance, so using a pointer here
   Fish(vector<Fish> *f) {
     pose.pos() = circle() * 5;
-    // velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initSpeed);
+    pose.pos() = (rnd::ball<Vec3f>() * 5 * initRadius);
     velocity = Vec3f(0, 0, 0);
-    acceleration = r() * initSpeed;
-    // acceleration = Vec3f(0, 0, 0);
+    // acceleration = r() * initSpeed;
+    acceleration = Vec3f(0, 0, 0);
     color = HSV(rnd::uniform(), 1, 1);
     // pointing the *p to *particles so we can access the actual vector
     // via *p, by accessing *particles
@@ -232,7 +205,7 @@ struct Fish {
       // 1.0 , 1.0 , 1.0 is an interesting stable combination
 
       sep = sep * 1.5f;
-      ali = ali * 2.0f;
+      ali = ali * 1.0f;
       coh = coh * 1.0f;
       stay = stay * 1.0f;
 
@@ -350,23 +323,20 @@ struct Fish {
   void seekTarget(vector<Plankton> planktons) {
     Quatf targetQuat;
     Vec3f targetPos;
-    float nearestP = 10000;
 
     for (int i = 0; i < planktons.size(); ++i) {
       float d = (pose.pos() - planktons[i].pose.pos()).mag();
-      if (d < nearestP) {
-        nearestP = d;
+      if (d < targetPlankton) {
+        targetPlankton = d;
+        targetPlanktonID = i;
         targetQuat = planktons[i].pose.quat();
         targetPos = planktons[i].pose.pos();
-      }
-      if (d < 5 * sphereRadius) {
-        planktons[i].alive = false;
       }
     }
     pose.quat().slerpTo(targetQuat, 0.06);
     Vec3f desired = targetPos - pose.pos();
-    Vec3f steer = desired.normalize() * maxAcceleration;
-    steer = (steer - velocity) * 0.2;
+    Vec3f steer = desired.normalize() * maxAcceleration * 1.0f;
+    steer = steer - velocity;
     applyForce(steer);
   }
 
@@ -378,8 +348,7 @@ struct Fish {
   }
 
   Vec3f stayInCircle() {
-    float d = pose.pos().mag() / 10;
-    cout << "fish d is " << d << endl;
+    float d = pose.pos().mag() / 3;
     if (d > OUT_BOUND) {
       return seek(Vec3f(0, 0, 0));
     } else
@@ -579,24 +548,23 @@ struct MyApp : App {
       }
       if (d2 < 50 * sphereRadius) {
         nearbyFish += 1;
-        // fishZeroList[i].seekTarget(userFishZero.nav.pos());
       }
+
+      // mark nearby fish dead
       if (d2 < 5 * sphereRadius) {
         fishZeroList[i].eaten();
       }
 
+      // mark nearby plankton dead
       fishZeroList[i].seekTarget(planktonList);
+      if (fishZeroList[i].targetPlankton < 5 * sphereRadius) {
+        planktonList[targetPlanktonID].eaten();
+      }
     }
 
     // plankton animation
     for (int i = 0; i < planktonList.size(); ++i) {
       planktonList[i].update();
-      // get distance
-      float diff =
-          (fishZeroList[i].pose.pos() - planktonList[i].pose.pos()).mag();
-      if (diff < 1 * sphereRadius) {
-        planktonList[i].eaten();
-      }
     }
 
     // how close is the target to viewer
