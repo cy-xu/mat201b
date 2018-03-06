@@ -40,7 +40,6 @@ double initSpeed = 100;        // initial condition
 double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
-int targetPlanktonID;
 
 // global variables for sound
 float targetToNav;
@@ -80,10 +79,13 @@ struct Plankton {
   // using *p here because we don't want to copy the actual particleList every
   // time creating an instance, so using a pointer here
   Plankton(vector<Plankton> *p) {
-    pose.pos() = circle() * 10;
+    // pose.pos() = circle() * 10;
+    pose.pos() = rnd::ball<Vec3f>() * 10.0f * initRadius;
+    pose.quat().set(float(rnd::uniform()), float(rnd::uniform()),
+                    float(rnd::uniform()), float(rnd::uniform()));
     velocity = Vec3f(0, 0, 0);
     acceleration = Vec3f(0, 0, 0);
-    color = RGB(150);
+    // color = RGB(150);
     // pointing the *p to *particles so we can access the actual vector
     // via *p, by accessing *particles
     planktons = p;
@@ -115,7 +117,6 @@ struct Plankton {
   void draw(Graphics &g) {
     g.pushMatrix();
     g.translate(pose.pos());
-    // g.rotate(pose.quat().inverse());
     g.rotate(pose.quat());
     g.color(color);
     g.draw(planktonMesh);
@@ -156,7 +157,7 @@ struct Plankton {
 
   void eaten() { alive = false; }
 
-  Vec3f stayInCircle() { return seek(rnd::ball<Vec3f>() * 50 * initRadius); }
+  Vec3f stayInCircle() { return seek(rnd::ball<Vec3f>() * 20.0f * initRadius); }
 
   void applyForce(Vec3f force) { acceleration += force; }
 };
@@ -169,6 +170,8 @@ struct Fish {
   Color color;
   bool alive;
   int id;
+  int myTargetID;
+  Plankton targetP;
 
   // *particles is the pointer to the actual particleList
   vector<Fish> *fishes;
@@ -179,7 +182,7 @@ struct Fish {
   // time creating an instance, so using a pointer here
   Fish(vector<Fish> *f) {
     pose.pos() = circle() * 5;
-    pose.pos() = (rnd::ball<Vec3f>() * 5 * initRadius);
+    pose.pos() = (rnd::ball<Vec3f>() * 10 * initRadius);
     velocity = Vec3f(0, 0, 0);
     // acceleration = r() * initSpeed;
     acceleration = Vec3f(0, 0, 0);
@@ -224,7 +227,6 @@ struct Fish {
   void draw(Graphics &g) {
     g.pushMatrix();
     g.translate(pose.pos());
-    // g.rotate(pose.quat().inverse());
     g.rotate(pose.quat());
     g.color(color);
     if (id % 5 == 0) {
@@ -270,7 +272,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 100 * sphereRadius) {
+      if (d > 0 && d < 30 * sphereRadius) {
         sum += other.acceleration;
         count++;
       }
@@ -292,7 +294,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 100 * sphereRadius) {
+      if (d > 0 && d < 30 * sphereRadius) {
         sum += other.pose.pos();
         count++;
       }
@@ -324,26 +326,29 @@ struct Fish {
     Quatf targetQuat;
     Vec3f targetPos;
 
-    for (int i = 0; i < planktons.size(); ++i) {
-      float d = (pose.pos() - planktons[i].pose.pos()).mag();
+    ///////// this is causing a bug
+    for (int ii = 0; ii < planktons.size(); ii++) {
+      float d = (pose.pos() - planktons[ii].pose.pos()).mag();
       if (d < targetPlankton) {
         targetPlankton = d;
-        targetPlanktonID = i;
-        targetQuat = planktons[i].pose.quat();
-        targetPos = planktons[i].pose.pos();
+        myTargetID = ii;
+        targetP = planktons[ii];
+        targetQuat = planktons[ii].pose.quat();
+        targetPos = planktons[ii].pose.pos();
       }
     }
     pose.quat().slerpTo(targetQuat, 0.06);
-    Vec3f desired = targetPos - pose.pos();
-    Vec3f steer = desired.normalize() * maxAcceleration * 1.0f;
-    steer = steer - velocity;
-    applyForce(steer);
+    // Vec3f desired = targetPos - pose.pos();
+    // Vec3f steer = desired.normalize() * maxSpeed * 1.0f;
+    // Vec3f steer = seek(targetPos) * 10.0f;
+    Vec3f steer = seek(targetPos) * 3.0f;
+    // applyForce(steer);
   }
 
   void runAway(Vec3f target) {
     Vec3f desired = target - pose.pos();
     Vec3f steer = -(desired.normalize() * maxSpeed);
-    steer = (steer - velocity) * 3;
+    steer = (steer - velocity) * 5.0f;
     applyForce(steer);
   }
 
@@ -355,7 +360,7 @@ struct Fish {
       // return seek(Vec3f(pose.pos().x + 10 * velocity.x,
       //                   rnd::uniform(initRadius),
       //                   pose.pos().z + 10 * velocity.z));
-      return seek(rnd::ball<Vec3f>() * 2 * initRadius);
+      return seek(rnd::ball<Vec3f>() * 10 * initRadius);
   }
 
   void applyForce(Vec3f force) { acceleration += force; }
@@ -434,9 +439,10 @@ string fullPathOrDie(string fileName, string whereToLook = ".") {
 // MyApp
 /////////////////////////////
 struct MyApp : App {
-  // for background (from Tim)
+  // for text and image
   Mesh bgMesh;
   Texture bgTexture;
+  Texture planktonTexture;
 
   // general environment setting
   Material material;
@@ -478,6 +484,19 @@ struct MyApp : App {
         exit(-1);
       }
       bgTexture.allocate(image.array());
+
+      // load image for plankton
+      addSphereWithTexcoords(planktonMesh);
+
+      Image planktonImage;
+      string filename2 = searchPaths.find("dot_plankton.png").filepath();
+      if (planktonImage.load(filename2)) {
+        cout << "Read image from " << filename << endl;
+      } else {
+        cout << "Failed to read image from " << filename << "!!!" << endl;
+        exit(-1);
+      }
+      planktonTexture.allocate(planktonImage.array());
     }
 
     // add vertices to empty Meshes
@@ -490,12 +509,12 @@ struct MyApp : App {
               1);
       addCone(fishMeshL, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 9), 16,
               1);
-      addSphere(planktonMesh, 0.5, 8, 8);
+      // addSphere(planktonMesh, 0.5, 8, 8);
       userFishMesh.generateNormals();
       fishMeshS.generateNormals();
       fishMeshM.generateNormals();
       fishMeshL.generateNormals();
-      planktonMesh.generateNormals();
+      // planktonMesh.generateNormals();
     }
 
     // pushing every Particle instance into the actual list
@@ -537,28 +556,31 @@ struct MyApp : App {
     for (int i = 0; i < fishZeroList.size(); ++i) {
       fishZeroList[i].update();
       fishZeroList[i].pose.faceToward(userFishZero.nav.pos());
+      // fishZeroList[i].pose.faceToward(fishZeroList[i].targetP.pose.pos());
 
       // get distance
       Vec3f diff_predator = fishZeroList[i].pose.pos() - userFishZero.nav.pos();
       float d2 = diff_predator.mag();
 
+      // mark nearby plankton dead
+      if (d2 > 50 * sphereRadius) {
+        fishZeroList[i].seekTarget(planktonList);
+        if (fishZeroList[i].targetPlankton < 3 * sphereRadius) {
+          planktonList[fishZeroList[i].myTargetID].eaten();
+        }
+      }
+
       // run away from predator
-      if (d2 < 60 * sphereRadius) {
+      if (d2 < 20 * sphereRadius) {
         fishZeroList[i].runAway(userFishZero.nav.pos());
       }
-      if (d2 < 50 * sphereRadius) {
+      if (d2 < 30 * sphereRadius) {
         nearbyFish += 1;
       }
 
       // mark nearby fish dead
       if (d2 < 5 * sphereRadius) {
         fishZeroList[i].eaten();
-      }
-
-      // mark nearby plankton dead
-      fishZeroList[i].seekTarget(planktonList);
-      if (fishZeroList[i].targetPlankton < 5 * sphereRadius) {
-        planktonList[targetPlanktonID].eaten();
       }
     }
 
@@ -601,11 +623,18 @@ struct MyApp : App {
         fish.draw(g);
       }
     }
+
+    // draw plankton with texture
+    g.pushMatrix();
+    planktonTexture.bind();
     for (auto p : planktonList) {
       if (p.alive == true) {
         p.draw(g);
       }
     }
+    planktonTexture.unbind();
+    g.popMatrix();
+
     userFishZero.draw(g);
     g.popMatrix();
   }
