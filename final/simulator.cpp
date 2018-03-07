@@ -430,6 +430,7 @@ struct GhostNet {
   Nav nav;
   Color color;
   double timePast;
+  int total;
 
   GhostNet() {
     nav.pos() =
@@ -441,29 +442,42 @@ struct GhostNet {
 
     // generate the shape
     addSurface(ghostNetMesh, rnd::uniform(25, 15), rnd::uniform(50, 25),
-               rnd::uniform(100, 50), rnd::uniform(200, 100));
+               rnd::uniform(50, 30), rnd::uniform(100, 50));
 
     // randomize the vertices
     for (int i = 0; i < ghostNetMesh.vertices().size(); i++) {
       ghostNetMesh.vertices()[i] += rnd::uniformS(5);
     }
 
-    ghostNetMesh.primitive(Graphics::LINE_STRIP);
+    ghostNetMesh.primitive(Graphics::LINE_LOOP);
     ghostNetMesh.generateNormals();
+
+    total = ghostNetMesh.vertices().size();
   }
 
   void wiggle(double dt) {
-    if (timePast > 1) {
-      timePast = 0;
-    } else {
-      timePast += dt;
-    }
-    int total = ghostNetMesh.vertices().size();
     // add random offset to vertices to make them wiggle and deform
-    if (timePast > 0.8) {
-      for (int i = 0; i < 30; i++) {
-        ghostNetMesh.vertices()[rnd::uniform(total)] += rnd::uniformS(2);
+    for (int i = 0; i < total - 2; i++) {
+      Vec3f *VertPointer;
+      VertPointer = &(ghostNetMesh.vertices()[i]);
+      Vec3f VertV, VertA;
+
+      Vec3f diff = ghostNetMesh.vertices()[i] - ghostNetMesh.vertices()[i + 1];
+      Vec3f midd =
+          (ghostNetMesh.vertices()[i] + ghostNetMesh.vertices()[i + 1]) / 2;
+      float d = diff.mag();
+      if (d > 0 && d < 5) {
+        diff.normalize(maxSpeed);
+        diff -= VertV;
+        VertA += diff;
+      } else {
+        midd -= midd - ghostNetMesh.vertices()[i];
+        midd.normalize(maxSpeed);
+        VertA += midd;
       }
+
+      VertV += VertA * timeStep;
+      *VertPointer += VertV * timeStep;
     }
     ghostNetMesh.generateNormals();
   }
@@ -482,14 +496,14 @@ struct GhostNet {
     }
     if (count > 0) {
       sum = sum / count;
-      sum.normalize(maxSpeed);
+      sum.normalize(maxSpeed / 2);
       steer = sum - velocity;
       applyForce(steer);
     }
     if (nav.pos().y > 0) {
-      applyForce(Vec3f(0, -5, 0));
+      applyForce(Vec3f(0, -2, 0));
     } else {
-      applyForce(Vec3f(0, 2, 0));
+      applyForce(Vec3f(0, 1, 0));
     }
   }
 
@@ -699,7 +713,15 @@ struct MyApp : App {
     ghostNet0.wiggle(dt);
     ghostNet0.flowInSea(fishZeroList);
     ghostNet0.update();
-    ghostNet0.nav.quat().slerpTo(userFishZero.nav.quat(), 0.001);
+    // ghostNet0.nav.quat().slerpTo(userFishZero.nav.quat(), 0.001);
+
+    // for each fish...
+    //   find the closest vertex in the ghostnet mesh
+    //   if it's within N units, 'catch" the fish
+    //   catching the fish means applying a force
+    for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
+      Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
+    }
 
     // how close is the target to viewer
     Vec3f diff_nav = nav().pos() - userFishZero.nav.pos();
