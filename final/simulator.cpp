@@ -429,38 +429,71 @@ struct GhostNet {
   Vec3f velocity, acceleration, lastPos;
   Nav nav;
   Color color;
+  double timePast;
 
   GhostNet() {
-    nav.pos() = Vec3f(10, 100, 10) * r();
+    nav.pos() =
+        Vec3f(rnd::uniform(100), rnd::uniform(400, 100), rnd::uniform(100));
     nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
                    float(rnd::uniform()), float(rnd::uniform()));
-    velocity = Vec3f(0, -10, 0);
-    color = RGB(1);
+    velocity = Vec3f(0, 0, 0);
+    color = RGB(0.95f);
 
     // generate the shape
-    addSurface(ghostNetMesh, rnd::uniform(50, 20), rnd::uniform(50, 20),
-               rnd::uniform(20, 5), rnd::uniform(20, 5));
-    ghostNetMesh.primitive(Graphics::LINES);
+    addSurface(ghostNetMesh, rnd::uniform(25, 15), rnd::uniform(50, 25),
+               rnd::uniform(100, 50), rnd::uniform(200, 100));
+
+    // randomize the vertices
+    for (int i = 0; i < ghostNetMesh.vertices().size(); i++) {
+      ghostNetMesh.vertices()[i] += rnd::uniformS(5);
+    }
+
+    ghostNetMesh.primitive(Graphics::LINE_STRIP);
     ghostNetMesh.generateNormals();
   }
 
-  void wiggle() {
+  void wiggle(double dt) {
+    if (timePast > 1) {
+      timePast = 0;
+    } else {
+      timePast += dt;
+    }
+    int total = ghostNetMesh.vertices().size();
     // add random offset to vertices to make them wiggle and deform
-    for (int i = 0; i < ghostNetMesh.vertices().size(); i++) {
-      ghostNetMesh.vertices()[i] += rnd::uniformS() * 0.01;
+    if (timePast > 0.8) {
+      for (int i = 0; i < 30; i++) {
+        ghostNetMesh.vertices()[rnd::uniform(total)] += rnd::uniformS(2);
+      }
     }
     ghostNetMesh.generateNormals();
   }
 
-  void draw(Graphics &g) {
-    g.pushMatrix();
-    g.translate(nav.pos());
-    g.rotate(nav.quat());
-    g.color(color);
-    g.draw(userFishMesh);
-    g.popMatrix();
-    // g.draw(tentacles);
+  void flowInSea(vector<Fish> fishes) {
+    int count = 0;
+    Vec3f steer;
+    Vec3f sum;
+
+    for (auto fish : fishes) {
+      Vec3f diff = (nav.pos() - fish.pose.pos()).mag();
+      if (diff > 0 && diff < 100 * sphereRadius) {
+        sum += fish.acceleration;
+        count++;
+      }
+    }
+    if (count > 0) {
+      sum = sum / count;
+      sum.normalize(maxSpeed);
+      steer = sum - velocity;
+      applyForce(steer);
+    }
+    if (nav.pos().y > 0) {
+      applyForce(Vec3f(0, -5, 0));
+    } else {
+      applyForce(Vec3f(0, 2, 0));
+    }
   }
+
+  void applyForce(Vec3f force) { acceleration += force; }
 
   void update() {
     velocity += acceleration * timeStep;
@@ -468,7 +501,15 @@ struct GhostNet {
     acceleration.zero();  // reset acceleration after each update
   }
 
-  void applyForce(Vec3f force) { acceleration += force; }
+  void draw(Graphics &g) {
+    g.pushMatrix();
+    g.translate(nav.pos());
+    g.rotate(nav.quat());
+    g.color(color);
+    g.draw(ghostNetMesh);
+    g.popMatrix();
+    // g.draw(tentacles);
+  }
 };
 
 string fullPathOrDie(string fileName, string whereToLook = ".") {
@@ -496,6 +537,7 @@ struct MyApp : App {
   vector<Fish> fishZeroList;
   vector<Plankton> planktonList;
   UserFish userFishZero;
+  GhostNet ghostNet0;
 
   // for sound
   gam::SineD<> sined;
@@ -589,7 +631,7 @@ struct MyApp : App {
       return;
 
     // light position
-    // light.pos(userFishZero.nav.pos());
+    light.pos(userFishZero.nav.pos());
 
     // userFish animation
     userFishZero.update();
@@ -653,6 +695,12 @@ struct MyApp : App {
       planktonList[i].update();
     }
 
+    // ghost net animation
+    ghostNet0.wiggle(dt);
+    ghostNet0.flowInSea(fishZeroList);
+    ghostNet0.update();
+    ghostNet0.nav.quat().slerpTo(userFishZero.nav.quat(), 0.001);
+
     // how close is the target to viewer
     Vec3f diff_nav = nav().pos() - userFishZero.nav.pos();
     targetToNav = diff_nav.mag();  // it ranges from 50 - 100
@@ -700,6 +748,7 @@ struct MyApp : App {
     g.popMatrix();
 
     userFishZero.draw(g);
+    ghostNet0.draw(g);
     g.popMatrix();
   }
 
