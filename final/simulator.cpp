@@ -94,7 +94,7 @@ struct Plankton {
 
   void update() {
     if (alive == false) {
-      pose.pos() = Vec3f(0, 0, 10000);
+      pose.pos() = Vec3f(0, 100000, 0);
     } else {
       // since *particles is inside class, no need to bring into the
       // functions.
@@ -164,14 +164,15 @@ struct Plankton {
 
 // NormalFish
 struct Fish {
-  float lifespan, mass, targetPlankton = 10000;
+  float lifespan, mass, targetP_diff = 10000;
   Vec3f velocity, acceleration;
   Pose pose, target;
   Color color;
   bool alive;
   int id;
-  int myTargetID;
-  Plankton targetP;
+
+  // for target plankton
+  int targetID;
 
   // *particles is the pointer to the actual particleList
   vector<Fish> *fishes;
@@ -181,9 +182,10 @@ struct Fish {
   // using *p here because we don't want to copy the actual particleList every
   // time creating an instance, so using a pointer here
   Fish(vector<Fish> *f) {
-    pose.pos() = circle() * 5;
+    // pose.pos() = circle() * 5;
     pose.pos() = (rnd::ball<Vec3f>() * 10 * initRadius);
-    velocity = Vec3f(0, 0, 0);
+    velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initSpeed);
+    // velocity = Vec3f(0, 0, 0);
     // acceleration = r() * initSpeed;
     acceleration = Vec3f(0, 0, 0);
     color = HSV(rnd::uniform(), 1, 1);
@@ -208,7 +210,7 @@ struct Fish {
       // 1.0 , 1.0 , 1.0 is an interesting stable combination
 
       sep = sep * 1.5f;
-      ali = ali * 1.0f;
+      ali = ali * 2.0f;
       coh = coh * 1.0f;
       stay = stay * 1.0f;
 
@@ -272,7 +274,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 30 * sphereRadius) {
+      if (d > 0 && d < 50 * sphereRadius) {
         sum += other.acceleration;
         count++;
       }
@@ -294,7 +296,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 30 * sphereRadius) {
+      if (d > 0 && d < 50 * sphereRadius) {
         sum += other.pose.pos();
         count++;
       }
@@ -317,32 +319,10 @@ struct Fish {
 
   void eaten() { alive = false; }
 
-  // void seekTarget(Vec3f target) {
-  //   Vec3f steer = seek(target).normalize();
-  //   steer = steer * maxAcceleration;
-  //   applyForce(steer);
-  // }
-  void seekTarget(vector<Plankton> planktons) {
-    Quatf targetQuat;
-    Vec3f targetPos;
-
-    ///////// this is causing a bug
-    for (int ii = 0; ii < planktons.size(); ii++) {
-      float d = (pose.pos() - planktons[ii].pose.pos()).mag();
-      if (d < targetPlankton) {
-        targetPlankton = d;
-        myTargetID = ii;
-        targetP = planktons[ii];
-        targetQuat = planktons[ii].pose.quat();
-        targetPos = planktons[ii].pose.pos();
-      }
-    }
-    pose.quat().slerpTo(targetQuat, 0.06);
-    // Vec3f desired = targetPos - pose.pos();
-    // Vec3f steer = desired.normalize() * maxSpeed * 1.0f;
-    // Vec3f steer = seek(targetPos) * 10.0f;
-    Vec3f steer = seek(targetPos) * 3.0f;
-    // applyForce(steer);
+  void seekTarget(Vec3f target) {
+    Vec3f steer = seek(target).normalize();
+    steer = steer * maxSpeed;
+    applyForce(steer);
   }
 
   void runAway(Vec3f target) {
@@ -353,6 +333,7 @@ struct Fish {
   }
 
   Vec3f stayInCircle() {
+    // needs a way to normalize the .mag()
     float d = pose.pos().mag() / 3;
     if (d > OUT_BOUND) {
       return seek(Vec3f(0, 0, 0));
@@ -554,34 +535,44 @@ struct MyApp : App {
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
-      fishZeroList[i].update();
-      fishZeroList[i].pose.faceToward(userFishZero.nav.pos());
-      // fishZeroList[i].pose.faceToward(fishZeroList[i].targetP.pose.pos());
+      Fish me = fishZeroList[i];
 
-      // get distance
-      Vec3f diff_predator = fishZeroList[i].pose.pos() - userFishZero.nav.pos();
+      me.update();
+
+      // get distance between user fish
+      Vec3f diff_predator = me.pose.pos() - userFishZero.nav.pos();
       float d2 = diff_predator.mag();
-
-      // mark nearby plankton dead
-      if (d2 > 50 * sphereRadius) {
-        fishZeroList[i].seekTarget(planktonList);
-        if (fishZeroList[i].targetPlankton < 3 * sphereRadius) {
-          planktonList[fishZeroList[i].myTargetID].eaten();
-        }
-      }
 
       // run away from predator
       if (d2 < 20 * sphereRadius) {
-        fishZeroList[i].runAway(userFishZero.nav.pos());
+        me.runAway(userFishZero.nav.pos());
       }
+      // mark nearby fish dead
+      if (d2 < 5 * sphereRadius) {
+        me.eaten();
+      }
+
       if (d2 < 30 * sphereRadius) {
         nearbyFish += 1;
       }
 
-      // mark nearby fish dead
-      if (d2 < 5 * sphereRadius) {
-        fishZeroList[i].eaten();
+      ///////// this is causing a bug
+      for (int ii = 0; ii < planktonList.size(); ii++) {
+        float p_diff = (me.pose.pos() - planktonList[ii].pose.pos()).mag();
+        if (p_diff < me.targetP_diff) {
+          me.targetP_diff = p_diff;
+          me.targetID = ii;
+        }
       }
+      if (me.targetP_diff > 5 * sphereRadius) {
+        me.seekTarget(planktonList[me.targetID].pose.pos());
+      } else {
+        planktonList[me.targetID].eaten();
+      }
+
+      me.pose.quat().slerpTo(planktonList[me.targetID].pose.quat(), 0.5);
+
+      fishZeroList[i] = me;
     }
 
     // plankton animation
