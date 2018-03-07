@@ -1,14 +1,9 @@
-/******************************************************************
+/*
 MAT 201B, 2018 Winter
-Author: Chengyuan Xu, cxu@ucsb.edu
-
-Reference:
+Chengyuan Xu, cxu@ucsb.edu
 Based on starter code by Karl Yerkes
-Flocking based on The Nature of Code by Daniel Shiffman
-textured_background.cpp by Tim Wood
-
-License: GPL-3.0
-******************************************************************/
+MIT License (details omitted)
+*/
 
 // struct boid;
 // struct clan (boids);
@@ -16,7 +11,6 @@ License: GPL-3.0
 // struct targetGroup;
 // struct myApp (clan, targetGroup)
 
-#include <cassert>  // gets you assert()
 #include "Cuttlebone/Cuttlebone.hpp"
 #include "Gamma/Oscillator.h"
 #include "allocore/io/al_App.hpp"
@@ -41,6 +35,9 @@ double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
 
+Mesh fishMesh;
+Mesh userFishMesh;
+
 // global variables for sound
 float targetToNav;
 float nearbyFish;
@@ -55,124 +52,13 @@ Vec3f circle() {
       initRadius * cos(rnd::uniformS(2 * M_PI)));
 }
 
-// global mesh variables
-Mesh userFishMesh;
-Mesh fishMeshS;
-Mesh fishMeshM;
-Mesh fishMeshL;
-Mesh planktonMesh;
-
-// Plankton
-struct Plankton {
+// NormalFish
+struct Fish {
   float lifespan, mass;
   Vec3f velocity, acceleration;
   Pose pose, target;
   Color color;
   bool alive;
-  int id;
-
-  // *particles is the pointer to the actual particleList
-  vector<Plankton> *planktons;
-
-  Plankton() {}
-
-  // using *p here because we don't want to copy the actual particleList every
-  // time creating an instance, so using a pointer here
-  Plankton(vector<Plankton> *p) {
-    // pose.pos() = circle() * 10;
-    pose.pos() = rnd::ball<Vec3f>() * 10.0f * initRadius;
-    pose.quat().set(float(rnd::uniform()), float(rnd::uniform()),
-                    float(rnd::uniform()), float(rnd::uniform()));
-    velocity = Vec3f(0, 0, 0);
-    acceleration = Vec3f(0, 0, 0);
-    // color = RGB(150);
-    // pointing the *p to *particles so we can access the actual vector
-    // via *p, by accessing *particles
-    planktons = p;
-    alive = true;
-  }
-
-  void update() {
-    if (alive == false) {
-      pose.pos() = Vec3f(0, 100000, 0);
-    } else {
-      // since *particles is inside class, no need to bring into the
-      // functions.
-      Vec3f sep = separate();
-      Vec3f stay = stayInCircle();
-
-      sep = sep * 1.5f;
-      stay = stay * 0.1f;
-
-      applyForce(sep);
-      applyForce(stay);
-
-      velocity += acceleration * timeStep;
-      pose.pos() += velocity * timeStep;
-
-      acceleration.zero();  // reset acceleration after each update
-    }
-  }
-
-  void draw(Graphics &g) {
-    g.pushMatrix();
-    g.translate(pose.pos());
-    g.rotate(pose.quat());
-    g.color(color);
-    g.draw(planktonMesh);
-    g.popMatrix();
-  }
-
-  Vec3f separate() {
-    int count = 0;
-    Vec3f steer;
-
-    for (auto other : *planktons) {
-      // this difference is a vector from b to a, put this force on a, so
-      // push away.
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      // if agents is getting closer, push away
-      if (d > 0 && d < 20 * sphereRadius) {
-        steer += difference.normalize() / d;
-        count++;
-      }
-    }
-    if (count > 0) {
-      steer = steer / count;
-    }
-    if (steer.mag() > 0) {
-      steer = steer.normalize() * maxSpeed;
-      steer -= velocity;
-    }
-    return steer;
-  }
-
-  Vec3f seek(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    Vec3f steer = desired.normalize(maxSpeed);
-    steer -= velocity;
-    return steer;
-  }
-
-  void eaten() { alive = false; }
-
-  Vec3f stayInCircle() { return seek(rnd::ball<Vec3f>() * 20.0f * initRadius); }
-
-  void applyForce(Vec3f force) { acceleration += force; }
-};
-
-// NormalFish
-struct Fish {
-  float lifespan, mass, targetP_diff;
-  Vec3f velocity, acceleration;
-  Pose pose, target;
-  Color color;
-  bool alive;
-  int id;
-
-  // for target plankton
-  int targetID;
 
   // *particles is the pointer to the actual particleList
   vector<Fish> *fishes;
@@ -182,12 +68,11 @@ struct Fish {
   // using *p here because we don't want to copy the actual particleList every
   // time creating an instance, so using a pointer here
   Fish(vector<Fish> *f) {
-    // pose.pos() = circle() * 5;
-    pose.pos() = (rnd::ball<Vec3f>() * 5 * initRadius);
-    velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initSpeed);
-    // velocity = Vec3f(0, 0, 0);
-    // acceleration = r() * initSpeed;
-    acceleration = Vec3f(0, 0, 0);
+    pose.pos() = circle();
+    // velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initSpeed);
+    velocity = Vec3f(0, 0, 0);
+    acceleration = r() * initSpeed;
+    // acceleration = Vec3f(0, 0, 0);
     color = HSV(rnd::uniform(), 1, 1);
     // pointing the *p to *particles so we can access the actual vector
     // via *p, by accessing *particles
@@ -223,22 +108,16 @@ struct Fish {
       pose.pos() += velocity * timeStep;
 
       acceleration.zero();  // reset acceleration after each update
-      targetP_diff = 10000.f;
     }
   }
 
   void draw(Graphics &g) {
     g.pushMatrix();
     g.translate(pose.pos());
+    // g.rotate(pose.quat().inverse());
     g.rotate(pose.quat());
     g.color(color);
-    if (id % 5 == 0) {
-      g.draw(fishMeshS);
-    } else if (id % 2 == 0) {
-      g.draw(fishMeshM);
-    } else {
-      g.draw(fishMeshL);
-    }
+    g.draw(fishMesh);
     g.popMatrix();
   }
 
@@ -322,29 +201,23 @@ struct Fish {
 
   void seekTarget(Vec3f target) {
     Vec3f steer = seek(target).normalize();
-    steer = steer * maxSpeed;
+    steer = steer * maxAcceleration;
     applyForce(steer);
   }
 
   void runAway(Vec3f target) {
     Vec3f desired = target - pose.pos();
     Vec3f steer = -(desired.normalize() * maxSpeed);
-    steer = (steer - velocity) * 3.0f;
+    steer = (steer - velocity) * 3;
     applyForce(steer);
   }
 
   Vec3f stayInCircle() {
-    // needs a way to normalize the .mag()
     float d = pose.pos().mag();
     if (d > OUT_BOUND) {
       return seek(Vec3f(0, 0, 0));
     } else
-      // return seek(Vec3f(pose.pos().x + 10 * velocity.x,
-      //                   rnd::uniform(initRadius),
-      //                   pose.pos().z + 10 * velocity.z));
-      return seek(rnd::ball<Vec3f>() * 2 * initRadius);
-    // return seek(Vec3f(velocity.x, rnd::uniformS(initRadius * 2),
-    // velocity.z));
+      return seek(Vec3f(velocity.x, rnd::uniformS(initRadius * 2), velocity.z));
   }
 
   void applyForce(Vec3f force) { acceleration += force; }
@@ -357,7 +230,6 @@ struct UserFish {
   Color color;
   Mesh tentacles;
   int idx;
-  bool autoMode;
 
   UserFish() {
     nav.pos() = Vec3f(0, 0, 0) * initRadius * 2;
@@ -392,7 +264,7 @@ struct UserFish {
   void seekTarget(vector<Fish> fishes) {
     Quatf targetQuat;
     Vec3f targetPos;
-    float nearestFish = 10000.f;
+    float nearestFish = 10000;
     for (auto fish : fishes) {
       float d = (nav.pos() - fish.pose.pos()).mag();
       if (d < nearestFish) {
@@ -401,7 +273,7 @@ struct UserFish {
         targetPos = fish.pose.pos();
       }
     }
-    nav.quat().slerpTo(targetQuat, 0.5f);
+    nav.quat().slerpTo(targetQuat, 0.06);
 
     Vec3f desired = targetPos - nav.pos();
     Vec3f steer = desired.normalize() * maxAcceleration;
@@ -412,30 +284,16 @@ struct UserFish {
   void applyForce(Vec3f force) { acceleration += force; }
 };
 
-string fullPathOrDie(string fileName, string whereToLook = ".") {
-  SearchPaths searchPaths;
-  searchPaths.addSearchPath(whereToLook);
-  string filePath = searchPaths.find(fileName).filepath();
-  assert(filePath != "");
-  return filePath;
-}
-
 // MyApp
 /////////////////////////////
 struct MyApp : App {
-  // for text and image
-  Mesh bgMesh;
-  Texture bgTexture;
-  Texture planktonTexture;
-
-  // general environment setting
   Material material;
   Light light;
   bool simulate = true;
 
   // creating the real particleList, it's now empty
   vector<Fish> fishZeroList;
-  vector<Plankton> planktonList;
+  Fish fish;
   UserFish userFishZero;
 
   // for sound
@@ -443,74 +301,23 @@ struct MyApp : App {
   gam::Accum<> timer;
 
   MyApp() {
-    light.pos(0, 0, 0);   // place the light
+    addCone(fishMesh, sphereRadius, Vec3f(0, 0, sphereRadius * 3), 16, 1);
+    fishMesh.generateNormals();
+
+    addCone(userFishMesh, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 9), 16,
+            1);
+    userFishMesh.generateNormals();
+
+    light.pos(0, 10, 10);  // place the light
+    // light.diffuse();
     nav().pos(0, 0, 50);  // place the viewer
+    lens().far(400);      // set the far clipping plane
     background(Color(0.1));
-
-    // set near/far clip
-    lens().near(0.1);
-    lens().far(1000);  // increase far clip to 1000 GL Units
-
-    // generate sphere with texture coordinates
-    {
-      addSphereWithTexcoords(bgMesh);
-
-      // load image into texture print out error and exit if failure
-      Image image;
-      SearchPaths searchPaths;
-      searchPaths.addSearchPath(".");
-      string filename =
-          searchPaths.find("DSC06307_Panorama_dark.jpg").filepath();
-      if (image.load(filename)) {
-        cout << "Read image from " << filename << endl;
-      } else {
-        cout << "Failed to read image from " << filename << "!!!" << endl;
-        exit(-1);
-      }
-      bgTexture.allocate(image.array());
-
-      // load image for plankton
-      addSphereWithTexcoords(planktonMesh);
-
-      Image planktonImage;
-      string filename2 = searchPaths.find("dot_plankton.png").filepath();
-      if (planktonImage.load(filename2)) {
-        cout << "Read image from " << filename << endl;
-      } else {
-        cout << "Failed to read image from " << filename << "!!!" << endl;
-        exit(-1);
-      }
-      planktonTexture.allocate(planktonImage.array());
-    }
-
-    // add vertices to empty Meshes
-    {
-      addCone(userFishMesh, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 9), 16,
-              1);
-      addCone(fishMeshS, sphereRadius * 1, Vec3f(0, 0, sphereRadius * 3), 16,
-              1);
-      addCone(fishMeshM, sphereRadius * 2, Vec3f(0, 0, sphereRadius * 6), 16,
-              1);
-      addCone(fishMeshL, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 9), 16,
-              1);
-      // addSphere(planktonMesh, 0.5, 8, 8);
-      userFishMesh.generateNormals();
-      fishMeshS.generateNormals();
-      fishMeshM.generateNormals();
-      fishMeshL.generateNormals();
-      // planktonMesh.generateNormals();
-    }
 
     // pushing every Particle instance into the actual list
     for (int i = 0; i < fishCount; i++) {
       Fish newFish(&fishZeroList);
       fishZeroList.push_back(newFish);
-      newFish.id = i;
-    }
-    for (int i = 0; i < fishCount * 2; i++) {
-      Plankton newPlankton(&planktonList);
-      planktonList.push_back(newPlankton);
-      newPlankton.id = i;
     }
 
     initWindow();
@@ -532,58 +339,27 @@ struct MyApp : App {
 
     // userFish animation
     userFishZero.update();
-    if (userFishZero.autoMode) {
-      userFishZero.seekTarget(fishZeroList);
-    }
+    userFishZero.seekTarget(fishZeroList);
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
-      Fish me = fishZeroList[i];
-
-      me.update();
-      // me.pose.faceToward(userFishZero.nav.pos());
-
-      // get distance between user fish
-      Vec3f diff_predator = me.pose.pos() - userFishZero.nav.pos();
-      float d2 = diff_predator.mag();
+      fishZeroList[i].update();
+      fishZeroList[i].pose.faceToward(userFishZero.nav.pos());
 
       // run away from predator
-      if (d2 < 60 * sphereRadius) {
-        me.runAway(userFishZero.nav.pos());
-      }
-      // mark nearby fish dead
-      if (d2 < 5 * sphereRadius) {
-        me.eaten();
-      }
+      Vec3f diff_predator = fishZeroList[i].pose.pos() - userFishZero.nav.pos();
+      float d2 = diff_predator.mag();
 
-      if (d2 < 30 * sphereRadius) {
+      if (d2 < 50 * sphereRadius) {
         nearbyFish += 1;
+        // fishZeroList[i].seekTarget(userFishZero.nav.pos());
       }
-
-      ///////// this is causing a bug
-      me.targetP_diff = 10000.f;  // reset target diff to 10000;
-      for (int ii = 0; ii < planktonList.size(); ii++) {
-        float p_diff = (me.pose.pos() - planktonList[ii].pose.pos()).mag();
-        if (p_diff < me.targetP_diff) {
-          me.targetP_diff = p_diff;
-          me.targetID = ii;
-        }
+      if (d2 < 60 * sphereRadius) {
+        fishZeroList[i].runAway(userFishZero.nav.pos());
       }
-      if (me.targetP_diff > 2 * sphereRadius) {
-        me.seekTarget(planktonList[me.targetID].pose.pos());
-        me.pose.quat().slerpTo(planktonList[me.targetID].pose.quat(), 0.06);
-      } else {
-        planktonList[me.targetID].eaten();
+      if (d2 < 5 * sphereRadius) {
+        fishZeroList[i].eaten();
       }
-
-      // me.pose.quat().slerpTo(planktonList[me.targetID].pose.quat(), 0.06);
-
-      fishZeroList[i] = me;
-    }
-
-    // plankton animation
-    for (int i = 0; i < planktonList.size(); ++i) {
-      planktonList[i].update();
     }
 
     // how close is the target to viewer
@@ -592,48 +368,16 @@ struct MyApp : App {
     timer.freq(nearbyFish);
   }
 
-  void onDraw(Graphics &g, const Viewpoint &v) {
-    // draw background textured sphere centered at nav
-    // turn off lighting
-    g.lighting(false);
-    // disable depth buffer, so that background will be drawn over
-    g.depthMask(false);
-
-    g.pushMatrix();
-    g.translate(nav().pos());
-    g.rotate(180, 0, 0, 1);
-    bgTexture.bind();
-    g.color(1, 1, 1);
-    g.draw(bgMesh);
-    bgTexture.unbind();
-    g.popMatrix();
-
-    g.depthMask(true);  // turn depth mask back on
-
-    // draw original scene here
-    light();  // enable light
+  void onDraw(Graphics &g) {
     material();
-    g.pushMatrix();
+    light();
     g.scale(scaleFactor);
     for (auto fish : fishZeroList) {
       if (fish.alive == true) {
         fish.draw(g);
       }
     }
-
-    // draw plankton with texture
-    g.pushMatrix();
-    planktonTexture.bind();
-    for (auto p : planktonList) {
-      if (p.alive == true) {
-        p.draw(g);
-      }
-    }
-    planktonTexture.unbind();
-    g.popMatrix();
-
     userFishZero.draw(g);
-    g.popMatrix();
   }
 
   void onKeyDown(const ViewpointWindow &, const Keyboard &k) {
@@ -667,13 +411,6 @@ struct MyApp : App {
       case '4':
         // pause the simulation
         //   simulate = !simulate;
-        break;
-      case '5':
-        // change auto/manual control
-        if (userFishZero.autoMode)
-          userFishZero.autoMode = false;
-        else
-          userFishZero.autoMode = true;
         break;
     }
   }
