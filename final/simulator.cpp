@@ -296,17 +296,22 @@ struct Fish {
   Vec3f cohesion() {
     int count = 0;
     Vec3f sum;
+    // Quat<float> sumQuat;
 
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
       if (d > 0 && d < 100 * sphereRadius) {
         sum += other.pose.pos();
+        // sumQuat += other.pose.quat();
         count++;
       }
     }
     if (count > 0) {
       sum = sum / count;
+      // sumQuat = sumQuat / count;
+      // pose.lerp(sumQuat, 0.1);
+      // pose.slerpTo(sumQuat, 0.1);
       sum.normalize(maxSpeed);
       return seek(sum);
     } else {
@@ -360,6 +365,8 @@ struct UserFish {
   Color color;
   Mesh tentacles;
   bool autoMode;
+  // Quatf targetQuat;
+  // Vec3f targetPos;
 
   UserFish() {
     nav.pos() = Vec3f(0, 0, 0) * initRadius * 2;
@@ -391,24 +398,24 @@ struct UserFish {
     acceleration.zero();  // reset acceleration after each update
   }
 
-  void seekTarget(vector<Fish> fishes) {
-    Quatf targetQuat;
-    Vec3f targetPos;
+  void findNewTarget(vector<Fish> fishes) {
     float nearestFish = 10000.f;
     for (auto fish : fishes) {
       float d = (nav.pos() - fish.pose.pos()).mag();
       if (d < nearestFish) {
         nearestFish = d;
-        targetQuat = fish.pose.quat();
-        targetPos = fish.pose.pos();
+        // targetQuat = fish.pose.quat();
+        // targetPos = fish.pose.pos();
         targetFishID = fish.id;
         // cout << "target fish id = " << fish.id << endl;
       }
     }
-    nav.quat().slerpTo(targetQuat, 0.1f);
+  }
 
+  void seekTarget(Vec3f targetPos) {
     Vec3f desired = targetPos - nav.pos();
-    Vec3f steer = desired.normalize() * maxAcceleration;
+    // Vec3f steer = desired.normalize() * maxAcceleration;
+    Vec3f steer = desired.normalize() * maxSpeed;
     steer = steer - velocity;
     applyForce(steer);
   }
@@ -489,13 +496,13 @@ struct MyApp : App {
 
     // add vertices to empty Meshes
     {
-      addCone(userFishMesh, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 9), 16,
+      addCone(userFishMesh, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 12),
+              16, 1);
+      addCone(fishMeshS, sphereRadius * 1, Vec3f(0, 0, sphereRadius * 2), 16,
               1);
-      addCone(fishMeshS, sphereRadius * 1, Vec3f(0, 0, sphereRadius * 3), 16,
+      addCone(fishMeshM, sphereRadius * 1.5, Vec3f(0, 0, sphereRadius * 4), 16,
               1);
-      addCone(fishMeshM, sphereRadius * 2, Vec3f(0, 0, sphereRadius * 6), 16,
-              1);
-      addCone(fishMeshL, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 9), 16,
+      addCone(fishMeshL, sphereRadius * 2, Vec3f(0, 0, sphereRadius * 6), 16,
               1);
       // addSphere(planktonMesh, 0.5, 8, 8);
       userFishMesh.generateNormals();
@@ -512,6 +519,7 @@ struct MyApp : App {
       // cout << "currently pushing fish " << newFish.id << endl;
       cout << "fish list size " << fishZeroList.size() << endl;
     }
+
     for (int i = 0; i < fishCount * 2; i++) {
       Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
@@ -519,6 +527,7 @@ struct MyApp : App {
 
     initWindow();
     initAudio();
+    userFishZero.findNewTarget(fishZeroList);
   }
 
   void onAnimate(double dt) {
@@ -536,19 +545,20 @@ struct MyApp : App {
 
     // userFish animation
     userFishZero.update();
-    if (userFishZero.autoMode) {
-      do {
-        userFishZero.seekTarget(fishZeroList);
-      } while (fishZeroList[targetFishID].alive == false);
+    // if (userFishZero.autoMode) {
+    userFishZero.seekTarget(fishZeroList[targetFishID].pose.pos());
+    userFishZero.nav.faceToward(fishZeroList[targetFishID].pose.pos(), 0.05);
+    if (fishZeroList[targetFishID].alive == false) {
+      userFishZero.findNewTarget(fishZeroList);
     }
-    cout << "currently chasing fish no." << targetFishID << endl;
+    cout << "current target? " << targetFishID << endl;
+    cout << "is the target alive? " << fishZeroList[targetFishID].alive << endl;
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
       Fish me = fishZeroList[i];
 
       me.update();
-      // me.pose.faceToward(userFishZero.nav.pos());
 
       // get distance between user fish
       Vec3f diff_predator = me.pose.pos() - userFishZero.nav.pos();
@@ -578,7 +588,8 @@ struct MyApp : App {
       }
       if (me.targetP_diff > 2 * sphereRadius) {
         me.seekTarget(planktonList[me.targetID].pose.pos());
-        me.pose.quat().slerpTo(planktonList[me.targetID].pose.quat(), 0.06);
+        // me.pose.quat().slerpTo(planktonList[me.targetID].pose.quat(), 0.06);
+        me.pose.faceToward(planktonList[me.targetID].pose.pos(), 0.01);
       } else {
         planktonList[me.targetID].eaten();
       }
