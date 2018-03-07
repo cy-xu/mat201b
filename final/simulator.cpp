@@ -40,6 +40,7 @@ double initSpeed = 100;        // initial condition
 double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
+int targetFishID = 0;
 
 // global variables for sound
 float targetToNav;
@@ -78,7 +79,7 @@ struct Plankton {
 
   // using *p here because we don't want to copy the actual particleList every
   // time creating an instance, so using a pointer here
-  Plankton(vector<Plankton> *p) {
+  Plankton(vector<Plankton> *p, int i) {
     // pose.pos() = circle() * 10;
     pose.pos() = rnd::ball<Vec3f>() * 10.0f * initRadius;
     pose.quat().set(float(rnd::uniform()), float(rnd::uniform()),
@@ -90,6 +91,7 @@ struct Plankton {
     // via *p, by accessing *particles
     planktons = p;
     alive = true;
+    id = i;
   }
 
   void update() {
@@ -181,7 +183,7 @@ struct Fish {
 
   // using *p here because we don't want to copy the actual particleList every
   // time creating an instance, so using a pointer here
-  Fish(vector<Fish> *f) {
+  Fish(vector<Fish> *f, int i) {
     // pose.pos() = circle() * 5;
     pose.pos() = (rnd::ball<Vec3f>() * 5 * initRadius);
     velocity = Vec3f(0, 0, 0).cross(pose.pos()).normalize(initSpeed);
@@ -193,6 +195,7 @@ struct Fish {
     // via *p, by accessing *particles
     fishes = f;
     alive = true;
+    id = i;
   }
 
   void update() {
@@ -217,7 +220,7 @@ struct Fish {
       applyForce(sep);
       applyForce(ali);
       applyForce(coh);
-      applyForce(stay);
+      // applyForce(stay);
 
       velocity += acceleration * timeStep;
       pose.pos() += velocity * timeStep;
@@ -356,7 +359,6 @@ struct UserFish {
   Nav nav;
   Color color;
   Mesh tentacles;
-  int idx;
   bool autoMode;
 
   UserFish() {
@@ -370,7 +372,7 @@ struct UserFish {
       tentacles.vertex(Vec3f());
       tentacles.color(RGB(1));
     }
-    idx = 0;
+    // id = 0;
   }
 
   void draw(Graphics &g) {
@@ -399,9 +401,11 @@ struct UserFish {
         nearestFish = d;
         targetQuat = fish.pose.quat();
         targetPos = fish.pose.pos();
+        targetFishID = fish.id;
+        // cout << "target fish id = " << fish.id << endl;
       }
     }
-    nav.quat().slerpTo(targetQuat, 0.5f);
+    nav.quat().slerpTo(targetQuat, 0.1f);
 
     Vec3f desired = targetPos - nav.pos();
     Vec3f steer = desired.normalize() * maxAcceleration;
@@ -503,14 +507,14 @@ struct MyApp : App {
 
     // pushing every Particle instance into the actual list
     for (int i = 0; i < fishCount; i++) {
-      Fish newFish(&fishZeroList);
+      Fish newFish(&fishZeroList, i);
       fishZeroList.push_back(newFish);
-      newFish.id = i;
+      // cout << "currently pushing fish " << newFish.id << endl;
+      cout << "fish list size " << fishZeroList.size() << endl;
     }
     for (int i = 0; i < fishCount * 2; i++) {
-      Plankton newPlankton(&planktonList);
+      Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
-      newPlankton.id = i;
     }
 
     initWindow();
@@ -533,8 +537,11 @@ struct MyApp : App {
     // userFish animation
     userFishZero.update();
     if (userFishZero.autoMode) {
-      userFishZero.seekTarget(fishZeroList);
+      do {
+        userFishZero.seekTarget(fishZeroList);
+      } while (fishZeroList[targetFishID].alive == false);
     }
+    cout << "currently chasing fish no." << targetFishID << endl;
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
@@ -575,8 +582,6 @@ struct MyApp : App {
       } else {
         planktonList[me.targetID].eaten();
       }
-
-      // me.pose.quat().slerpTo(planktonList[me.targetID].pose.quat(), 0.06);
 
       fishZeroList[i] = me;
     }
