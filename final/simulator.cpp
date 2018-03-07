@@ -212,7 +212,7 @@ struct Fish {
       // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
       // 1.0 , 1.0 , 1.0 is an interesting stable combination
 
-      sep = sep * 1.5f;
+      sep = sep * 2.5f;
       ali = ali * 2.0f;
       coh = coh * 1.0f;
       stay = stay * 1.0f;
@@ -278,7 +278,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 100 * sphereRadius) {
+      if (d > 0 && d < 60 * sphereRadius) {
         sum += other.acceleration;
         count++;
       }
@@ -301,7 +301,7 @@ struct Fish {
     for (auto other : *fishes) {
       Vec3f difference = (pose.pos() - other.pose.pos());
       float d = difference.mag();
-      if (d > 0 && d < 100 * sphereRadius) {
+      if (d > 0 && d < 60 * sphereRadius) {
         sum += other.pose.pos();
         // sumQuat += other.pose.quat();
         count++;
@@ -337,7 +337,7 @@ struct Fish {
   void runAway(Vec3f target) {
     Vec3f desired = target - pose.pos();
     Vec3f steer = -(desired.normalize() * maxSpeed);
-    steer = (steer - velocity) * 3.0f;
+    steer = (steer - velocity) * 20.0f;
     applyForce(steer);
   }
 
@@ -402,22 +402,70 @@ struct UserFish {
     float nearestFish = 10000.f;
     for (auto fish : fishes) {
       float d = (nav.pos() - fish.pose.pos()).mag();
-      if (d < nearestFish) {
+      if (d > 300 && d < nearestFish) {
         nearestFish = d;
         // targetQuat = fish.pose.quat();
         // targetPos = fish.pose.pos();
         targetFishID = fish.id;
-        // cout << "target fish id = " << fish.id << endl;
       }
+      cout << "target fish d = " << d << endl;
     }
   }
 
   void seekTarget(Vec3f targetPos) {
     Vec3f desired = targetPos - nav.pos();
-    // Vec3f steer = desired.normalize() * maxAcceleration;
-    Vec3f steer = desired.normalize() * maxSpeed;
+    Vec3f steer = desired.normalize() * maxAcceleration;
+    // Vec3f steer = desired.normalize() * maxSpeed;
     steer = steer - velocity;
     applyForce(steer);
+  }
+
+  void applyForce(Vec3f force) { acceleration += force; }
+};
+
+// Ghost net
+struct GhostNet {
+  Mesh ghostNetMesh;
+  Vec3f velocity, acceleration, lastPos;
+  Nav nav;
+  Color color;
+
+  GhostNet() {
+    nav.pos() = Vec3f(10, 100, 10) * r();
+    nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
+                   float(rnd::uniform()), float(rnd::uniform()));
+    velocity = Vec3f(0, -10, 0);
+    color = RGB(1);
+
+    // generate the shape
+    addSurface(ghostNetMesh, rnd::uniform(50, 20), rnd::uniform(50, 20),
+               rnd::uniform(20, 5), rnd::uniform(20, 5));
+    ghostNetMesh.primitive(Graphics::LINES);
+    ghostNetMesh.generateNormals();
+  }
+
+  void wiggle() {
+    // add random offset to vertices to make them wiggle and deform
+    for (int i = 0; i < ghostNetMesh.vertices().size(); i++) {
+      ghostNetMesh.vertices()[i] += rnd::uniformS() * 0.01;
+    }
+    ghostNetMesh.generateNormals();
+  }
+
+  void draw(Graphics &g) {
+    g.pushMatrix();
+    g.translate(nav.pos());
+    g.rotate(nav.quat());
+    g.color(color);
+    g.draw(userFishMesh);
+    g.popMatrix();
+    // g.draw(tentacles);
+  }
+
+  void update() {
+    velocity += acceleration * timeStep;
+    nav.pos() += velocity * timeStep;
+    acceleration.zero();  // reset acceleration after each update
   }
 
   void applyForce(Vec3f force) { acceleration += force; }
@@ -498,12 +546,12 @@ struct MyApp : App {
     {
       addCone(userFishMesh, sphereRadius * 3, Vec3f(0, 0, sphereRadius * 12),
               16, 1);
-      addCone(fishMeshS, sphereRadius * 1, Vec3f(0, 0, sphereRadius * 2), 16,
+      addCone(fishMeshS, sphereRadius * 0.5, Vec3f(0, 0, sphereRadius * 1.5),
+              16, 1);
+      addCone(fishMeshM, sphereRadius * 1, Vec3f(0, 0, sphereRadius * 3), 16,
               1);
-      addCone(fishMeshM, sphereRadius * 1.5, Vec3f(0, 0, sphereRadius * 4), 16,
-              1);
-      addCone(fishMeshL, sphereRadius * 2, Vec3f(0, 0, sphereRadius * 6), 16,
-              1);
+      addCone(fishMeshL, sphereRadius * 1.5, Vec3f(0, 0, sphereRadius * 4.5),
+              16, 1);
       // addSphere(planktonMesh, 0.5, 8, 8);
       userFishMesh.generateNormals();
       fishMeshS.generateNormals();
@@ -541,7 +589,7 @@ struct MyApp : App {
       return;
 
     // light position
-    light.pos(userFishZero.nav.pos());
+    // light.pos(userFishZero.nav.pos());
 
     // userFish animation
     userFishZero.update();
@@ -551,8 +599,9 @@ struct MyApp : App {
     if (fishZeroList[targetFishID].alive == false) {
       userFishZero.findNewTarget(fishZeroList);
     }
-    cout << "current target? " << targetFishID << endl;
-    cout << "is the target alive? " << fishZeroList[targetFishID].alive << endl;
+    // cout << "current target? " << targetFishID << endl;
+    // cout << "is the target alive? " << fishZeroList[targetFishID].alive <<
+    // endl;
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
@@ -566,10 +615,12 @@ struct MyApp : App {
 
       // run away from predator
       if (d2 < 60 * sphereRadius) {
-        me.runAway(userFishZero.nav.pos());
+        if (i != targetFishID) {
+          me.runAway(userFishZero.nav.pos());
+        }
       }
       // mark nearby fish dead
-      if (d2 < 5 * sphereRadius) {
+      if (d2 < 3 * sphereRadius) {
         me.eaten();
       }
 
@@ -692,6 +743,14 @@ struct MyApp : App {
           userFishZero.autoMode = true;
         break;
     }
+  }
+  virtual void onMouseDown(const ViewpointWindow &w, const Mouse &m) {
+    // normalize mouse position from -1.0 to 1.0
+    float x = float(m.x()) / w.width() * 2.f - 1.f;
+    float y = (float(m.y()) / w.height() * 2.f - 1.f) * -1.f;
+
+    // move light with mouse
+    light.pos(Vec3f(x, y, 1.f) * 10.f);
   }
 
   // virtual void onSound(AudioIOData &io) {
