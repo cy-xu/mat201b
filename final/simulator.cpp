@@ -16,6 +16,8 @@ License: GPL-3.0
 // struct targetGroup;
 // struct myApp (clan, targetGroup)
 
+#include <float.h>
+#include <math.h>
 #include <cassert>  // gets you assert()
 #include "Cuttlebone/Cuttlebone.hpp"
 #include "Gamma/Oscillator.h"
@@ -408,7 +410,6 @@ struct UserFish {
         // targetPos = fish.pose.pos();
         targetFishID = fish.id;
       }
-      // cout << "target fish d = " << d << endl;
     }
   }
 
@@ -425,8 +426,8 @@ struct UserFish {
 
 // Ghost net
 struct GhostNet {
-  Mesh ghostNetMesh;
-  Vec3f velocity, acceleration, lastPos;
+  Mesh ghostNetMesh, boundingBoxMesh;
+  Vec3f velocity, acceleration, center;
   Nav nav;
   Color color;
   double timePast;
@@ -456,25 +457,36 @@ struct GhostNet {
   }
 
   void wiggle(double dt) {
+    float topY = -FLT_MAX, bottomY = FLT_MAX, leftX = -FLT_MAX,
+          rightX = FLT_MAX, nearZ = -FLT_MAX, farZ = FLT_MAX;
+    float record = 0.f;
     // add random offset to vertices to make them wiggle and deform
-    for (int i = 0; i < total - 2; i++) {
+    for (int i = 0; i < total - 1; i++) {
       Vec3f *VertPointer;
       VertPointer = &(ghostNetMesh.vertices()[i]);
-      Vec3f VertV, VertA;
+      Vec3f VertV, VertA, steer;
+
+      // calculate ghost net's top vertices
+      // if (*VertPointer.y > topY) topY = *VertPointer.y;
+      // if (*VertPointer.y < bottomY) bottomY = *VertPointer.y;
+      // if (*VertPointer.x > leftX) leftX = *VertPointer.x;
+      // if (*VertPointer.x < rightX) rightX = *VertPointer.x;
+      // if (*VertPointer.z > nearZ) nearZ = *VertPointer.z;
+      // if (*VertPointer.z < farZ) farZ = *VertPointer.z;
 
       Vec3f diff = ghostNetMesh.vertices()[i] - ghostNetMesh.vertices()[i + 1];
       Vec3f midd =
           (ghostNetMesh.vertices()[i] + ghostNetMesh.vertices()[i + 1]) / 2;
       float d = diff.mag();
-      if (d > 0 && d < 10) {
+      if (d > 0 && d < 5) {
         diff.normalize(maxSpeed);
-        diff -= VertV;
-        VertA += diff;
+        steer = diff - VertV;
       } else {
         midd -= midd - ghostNetMesh.vertices()[i];
         midd.normalize(maxSpeed);
-        VertA += midd;
+        steer = midd;
       }
+      VertA += steer;
 
       VertV += VertA * timeStep;
       *VertPointer += VertV * timeStep;
@@ -620,8 +632,6 @@ struct MyApp : App {
     for (int i = 0; i < fishCount; i++) {
       Fish newFish(&fishZeroList, i);
       fishZeroList.push_back(newFish);
-      // cout << "currently pushing fish " << newFish.id << endl;
-      cout << "fish list size " << fishZeroList.size() << endl;
     }
 
     for (int i = 0; i < fishCount * 2; i++) {
@@ -655,9 +665,6 @@ struct MyApp : App {
     if (fishZeroList[targetFishID].alive == false) {
       userFishZero.findNewTarget(fishZeroList);
     }
-    // cout << "current target? " << targetFishID << endl;
-    // cout << "is the target alive? " << fishZeroList[targetFishID].alive <<
-    // endl;
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
@@ -691,8 +698,7 @@ struct MyApp : App {
       for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
         Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
         float d = (me.pose.pos() - position).mag();
-        if (d < 20 * sphereRadius) {
-          cout << "position is " << position << endl;
+        if (d < 3 * sphereRadius) {
           *mePosPointer = Vec3d(position.x, position.y, position.z);
         }
       }
@@ -714,10 +720,6 @@ struct MyApp : App {
       }
 
       fishZeroList[i] = me;
-      // fishZeroList[i].pose.pos() = *mePosPointer;
-
-      cout << "fishZeroList[i].pose.pos is " << fishZeroList[i].pose.pos()
-           << endl;
     }
 
     // plankton animation
