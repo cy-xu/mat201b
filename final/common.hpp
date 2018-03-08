@@ -26,10 +26,12 @@ struct FakeVector {
 // Common definition of application state
 //
 struct State {
-  FakeVector parPositions;
-  Vec3f targetPosition;
-  Vec3f predatorPosition;
+  FakeVector fishZeroPosComm;
+  FakeVector planktonPosComm;
+  Vec3f userFishPosition;
+  Pose ghostNetComm;
   float parNearTargetTemp;
+
   // FakeVector colors;
   // vector<Color> particleColors;
   // vector<Pose> particlePoses;

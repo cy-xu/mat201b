@@ -10,12 +10,6 @@ textured_background.cpp by Tim Wood
 License: GPL-3.0
 ******************************************************************/
 
-// struct boid;
-// struct clan (boids);
-// struct target;
-// struct targetGroup;
-// struct myApp (clan, targetGroup)
-
 #include <float.h>
 #include <math.h>
 #include <cassert>  // gets you assert()

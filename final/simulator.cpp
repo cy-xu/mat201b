@@ -10,12 +10,6 @@ textured_background.cpp by Tim Wood
 License: GPL-3.0
 ******************************************************************/
 
-// struct boid;
-// struct clan (boids);
-// struct target;
-// struct targetGroup;
-// struct myApp (clan, targetGroup)
-
 #include <float.h>
 #include <math.h>
 #include <cassert>  // gets you assert()
@@ -436,8 +430,8 @@ struct GhostNet {
   GhostNet() {
     nav.pos() =
         Vec3f(rnd::uniform(100), rnd::uniform(400, 100), rnd::uniform(100));
-    nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
-                   float(rnd::uniform()), float(rnd::uniform()));
+    // nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
+    //                float(rnd::uniform()), float(rnd::uniform()));
     velocity = Vec3f(0, 0, 0);
     color = RGB(0.95f);
 
@@ -483,7 +477,7 @@ struct GhostNet {
         steer = diff - VertV;
       } else {
         midd -= midd - ghostNetMesh.vertices()[i];
-        midd.normalize(maxSpeed);
+        midd.normalize(maxAcceleration);
         steer = midd;
       }
       VertA += steer;
@@ -494,10 +488,12 @@ struct GhostNet {
     ghostNetMesh.generateNormals();
   }
 
-  void flowInSea(vector<Fish> fishes) {
+  void flowInSea(vector<Fish> fishes, UserFish userFish) {
     int count = 0;
     Vec3f steer;
     Vec3f sum;
+
+    nav.quat().slerpTo(userFish.nav.quat(), 0.001);
 
     for (auto fish : fishes) {
       Vec3f diff = (nav.pos() - fish.pose.pos()).mag();
@@ -513,9 +509,9 @@ struct GhostNet {
       applyForce(steer);
     }
     if (nav.pos().y > 0) {
-      applyForce(Vec3f(0, -2, 0));
+      applyForce(Vec3f(0, -5, 0));
     } else {
-      applyForce(Vec3f(0, 1, 0));
+      applyForce(Vec3f(0, 3, 0));
     }
   }
 
@@ -549,6 +545,10 @@ string fullPathOrDie(string fileName, string whereToLook = ".") {
 // MyApp
 /////////////////////////////
 struct MyApp : App {
+  // Cuttlebone
+  State appState;
+  cuttlebone::Maker<State> maker;
+
   // for text and image
   Mesh bgMesh;
   Texture bgTexture;
@@ -562,6 +562,8 @@ struct MyApp : App {
   // creating the real particleList, it's now empty
   vector<Fish> fishZeroList;
   vector<Plankton> planktonList;
+  vector<Vec3f> fishZeroPositions;
+  vector<Vec3f> planktonPositions;
   UserFish userFishZero;
   GhostNet ghostNet0;
 
@@ -569,7 +571,7 @@ struct MyApp : App {
   gam::SineD<> sined;
   gam::Accum<> timer;
 
-  MyApp() {
+  MyApp() : maker("255.255.255.255") {
     light.pos(0, 0, 0);   // place the light
     nav().pos(0, 0, 50);  // place the viewer
     background(Color(0.1));
@@ -632,11 +634,13 @@ struct MyApp : App {
     for (int i = 0; i < fishCount; i++) {
       Fish newFish(&fishZeroList, i);
       fishZeroList.push_back(newFish);
+      fishZeroPositions.push_back(newFish.pose.pos());  // cuttlebone
     }
 
     for (int i = 0; i < fishCount * 2; i++) {
       Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
+      planktonPositions.push_back(newPlankton.pose.pos());  // cuttlebone
     }
 
     initWindow();
@@ -659,6 +663,7 @@ struct MyApp : App {
 
     // userFish animation
     userFishZero.update();
+    appState.userFishPosition = userFishZero.nav.pos();  // cuttlebone
     // if (userFishZero.autoMode) {
     userFishZero.seekTarget(fishZeroList[targetFishID].pose.pos());
     userFishZero.nav.faceToward(fishZeroList[targetFishID].pose.pos(), 0.05);
@@ -666,12 +671,26 @@ struct MyApp : App {
       userFishZero.findNewTarget(fishZeroList);
     }
 
+    // ghost net animation
+    ghostNet0.wiggle(dt);
+    ghostNet0.flowInSea(fishZeroList, userFishZero);
+    ghostNet0.update();
+    appState.ghostNetComm = ghostNet0.nav.pos();
+
+    // for each fish...
+    //   find the closest vertex in the ghostnet mesh
+    //   if it's within N units, 'catch" the fish
+    //   catching the fish means applying a force
+    // for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
+    //   Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
+    // }
+
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
-      Vec3d *mePosPointer;
-      mePosPointer = &(fishZeroList[i].pose.pos());
-
       Fish me = fishZeroList[i];
+
+      Vec3d *mePosPointer;
+      mePosPointer = &me.pose.pos();
 
       me.update();
 
@@ -696,10 +715,11 @@ struct MyApp : App {
 
       // ghost net catching fish
       for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
-        Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
+        Vec3f position =
+            ghostNet0.ghostNetMesh.vertices()[i] + ghostNet0.nav.pos();
         float d = (me.pose.pos() - position).mag();
         if (d < 3 * sphereRadius) {
-          *mePosPointer = Vec3d(position.x, position.y, position.z);
+          me.pose.pos() = position;
         }
       }
 
@@ -720,26 +740,21 @@ struct MyApp : App {
       }
 
       fishZeroList[i] = me;
+
+      // cuttlebone fish
+      fishZeroPositions[i] = fishZeroList[i].pose.pos();
+      appState.fishZeroPosComm.fill_stuff(fishZeroPositions);
     }
 
     // plankton animation
     for (int i = 0; i < planktonList.size(); ++i) {
       planktonList[i].update();
+      // cuttlebone plankton
+      planktonPositions[i] = planktonList[i].pose.pos();
+      appState.planktonPosComm.fill_stuff(planktonPositions);
     }
 
-    // ghost net animation
-    ghostNet0.wiggle(dt);
-    ghostNet0.flowInSea(fishZeroList);
-    ghostNet0.update();
-    ghostNet0.nav.quat().slerpTo(userFishZero.nav.quat(), 0.001);
-
-    // for each fish...
-    //   find the closest vertex in the ghostnet mesh
-    //   if it's within N units, 'catch" the fish
-    //   catching the fish means applying a force
-    for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
-      Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
-    }
+    maker.set(appState);  // cuttlebone
 
     // how close is the target to viewer
     Vec3f diff_nav = nav().pos() - userFishZero.nav.pos();
@@ -858,5 +873,6 @@ struct MyApp : App {
 
 int main() {
   MyApp app;
+  app.maker.start();
   app.start();
 }
