@@ -408,7 +408,7 @@ struct UserFish {
         // targetPos = fish.pose.pos();
         targetFishID = fish.id;
       }
-      cout << "target fish d = " << d << endl;
+      // cout << "target fish d = " << d << endl;
     }
   }
 
@@ -466,7 +466,7 @@ struct GhostNet {
       Vec3f midd =
           (ghostNetMesh.vertices()[i] + ghostNetMesh.vertices()[i + 1]) / 2;
       float d = diff.mag();
-      if (d > 0 && d < 5) {
+      if (d > 0 && d < 10) {
         diff.normalize(maxSpeed);
         diff -= VertV;
         VertA += diff;
@@ -661,6 +661,9 @@ struct MyApp : App {
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
+      Vec3d *mePosPointer;
+      mePosPointer = &(fishZeroList[i].pose.pos());
+
       Fish me = fishZeroList[i];
 
       me.update();
@@ -684,6 +687,16 @@ struct MyApp : App {
         nearbyFish += 1;
       }
 
+      // ghost net catching fish
+      for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
+        Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
+        float d = (me.pose.pos() - position).mag();
+        if (d < 20 * sphereRadius) {
+          cout << "position is " << position << endl;
+          *mePosPointer = Vec3d(position.x, position.y, position.z);
+        }
+      }
+
       ///////// this is causing a bug
       me.targetP_diff = 10000.f;  // reset target diff to 10000;
       for (int ii = 0; ii < planktonList.size(); ii++) {
@@ -695,13 +708,16 @@ struct MyApp : App {
       }
       if (me.targetP_diff > 2 * sphereRadius) {
         me.seekTarget(planktonList[me.targetID].pose.pos());
-        // me.pose.quat().slerpTo(planktonList[me.targetID].pose.quat(), 0.06);
         me.pose.faceToward(planktonList[me.targetID].pose.pos(), 0.01);
       } else {
         planktonList[me.targetID].eaten();
       }
 
       fishZeroList[i] = me;
+      // fishZeroList[i].pose.pos() = *mePosPointer;
+
+      cout << "fishZeroList[i].pose.pos is " << fishZeroList[i].pose.pos()
+           << endl;
     }
 
     // plankton animation
@@ -713,7 +729,7 @@ struct MyApp : App {
     ghostNet0.wiggle(dt);
     ghostNet0.flowInSea(fishZeroList);
     ghostNet0.update();
-    // ghostNet0.nav.quat().slerpTo(userFishZero.nav.quat(), 0.001);
+    ghostNet0.nav.quat().slerpTo(userFishZero.nav.quat(), 0.001);
 
     // for each fish...
     //   find the closest vertex in the ghostnet mesh
