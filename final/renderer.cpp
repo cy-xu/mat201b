@@ -661,27 +661,19 @@ struct MyApp : App {
     light.pos(userFishZero.nav.pos());
 
     // userFish animation
-    // userFishZero.update();
-    userFishZero.nav.pos() = appState.userFishPosition;  // cuttlebone
-    // if (userFishZero.autoMode) {
-    userFishZero.seekTarget(fishZeroList[targetFishID].pose.pos());
-    userFishZero.nav.faceToward(fishZeroList[targetFishID].pose.pos(), 0.05);
-    if (fishZeroList[targetFishID].alive == false) {
-      userFishZero.findNewTarget(fishZeroList);
-    }
+    userFishZero.nav = appState.userFishNav;  // cuttlebone
 
     // ghost net animation
     ghostNet0.wiggle(dt);
-    ghostNet0.flowInSea(fishZeroList, userFishZero);
-    // ghostNet0.update();
-    ghostNet0.nav.pos() = appState.ghostNetComm;
+    ghostNet0.nav = appState.ghostNetNav;
+    // ghostNet0.ghostNetMesh.vertices() = appState.ghostNetVerts;
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
-      Vec3d *mePosPointer;
-      mePosPointer = &(fishZeroList[i].pose.pos());
-
       Fish me = fishZeroList[i];
+
+      Vec3d *mePosPointer;
+      mePosPointer = &me.pose.pos();
 
       me.update();
 
@@ -732,9 +724,9 @@ struct MyApp : App {
       fishZeroList[i] = me;
 
       // cuttlebone fish
-      fishZeroList[i].pose.pos().x = appState.fishZeroPosComm.stuff[i].x;
-      fishZeroList[i].pose.pos().y = appState.fishZeroPosComm.stuff[i].y;
-      fishZeroList[i].pose.pos().z = appState.fishZeroPosComm.stuff[i].z;
+      fishZeroList[i].pose = appState.fishZeroPosComm.stuff[i];
+      fishZeroList[i].alive = appState.fishZeroAliveComm.stuff[i];
+      fishZeroList[i].color = appState.fishZeroColorComm.stuff[i];
     }
 
     // plankton animation

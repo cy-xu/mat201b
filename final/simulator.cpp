@@ -562,7 +562,9 @@ struct MyApp : App {
   // creating the real particleList, it's now empty
   vector<Fish> fishZeroList;
   vector<Plankton> planktonList;
-  vector<Vec3f> fishZeroPositions;
+  vector<Pose> fishZeroPoses;
+  vector<bool> fishZeroAlive;
+  vector<Color> fishZeroColor;
   vector<Vec3f> planktonPositions;
   UserFish userFishZero;
   GhostNet ghostNet0;
@@ -634,7 +636,9 @@ struct MyApp : App {
     for (int i = 0; i < fishCount; i++) {
       Fish newFish(&fishZeroList, i);
       fishZeroList.push_back(newFish);
-      fishZeroPositions.push_back(newFish.pose.pos());  // cuttlebone
+      fishZeroPoses.push_back(newFish.pose);   // cuttlebone
+      fishZeroAlive.push_back(newFish.alive);  // cuttlebone
+      fishZeroColor.push_back(newFish.color);  // cuttlebone
     }
 
     for (int i = 0; i < fishCount * 2; i++) {
@@ -663,7 +667,7 @@ struct MyApp : App {
 
     // userFish animation
     userFishZero.update();
-    appState.userFishPosition = userFishZero.nav.pos();  // cuttlebone
+    appState.userFishNav = userFishZero.nav;  // cuttlebone
     // if (userFishZero.autoMode) {
     userFishZero.seekTarget(fishZeroList[targetFishID].pose.pos());
     userFishZero.nav.faceToward(fishZeroList[targetFishID].pose.pos(), 0.05);
@@ -675,15 +679,8 @@ struct MyApp : App {
     ghostNet0.wiggle(dt);
     ghostNet0.flowInSea(fishZeroList, userFishZero);
     ghostNet0.update();
-    appState.ghostNetComm = ghostNet0.nav.pos();
-
-    // for each fish...
-    //   find the closest vertex in the ghostnet mesh
-    //   if it's within N units, 'catch" the fish
-    //   catching the fish means applying a force
-    // for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
-    //   Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
-    // }
+    appState.ghostNetNav = ghostNet0.nav;  // cuttlebone
+    // appState.ghostNetVerts = ghostNet0.ghostNetMesh.vertices();
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
@@ -742,8 +739,12 @@ struct MyApp : App {
       fishZeroList[i] = me;
 
       // cuttlebone fish
-      fishZeroPositions[i] = fishZeroList[i].pose.pos();
-      appState.fishZeroPosComm.fill_stuff(fishZeroPositions);
+      fishZeroPoses[i] = fishZeroList[i].pose;
+      fishZeroAlive[i] = fishZeroList[i].alive;
+      fishZeroColor[i] = fishZeroList[i].color;
+      appState.fishZeroPosComm.fill_stuff(fishZeroPoses);
+      appState.fishZeroAliveComm.fill_stuff(fishZeroAlive);
+      appState.fishZeroColorComm.fill_stuff(fishZeroColor);
     }
 
     // plankton animation

@@ -23,13 +23,48 @@ struct FakeVector {
   }
 };
 
+struct FakePoseVector {
+  unsigned n;
+  Pose stuff[MAX];
+
+  void fill_stuff(const vector<Pose>& v) {
+    n = v.size();
+    for (unsigned i = 0; i < v.size(); ++i) stuff[i] = v[i];
+  }
+};
+
+struct FakeBoolVector {
+  unsigned n;
+  bool stuff[MAX];
+
+  void fill_stuff(const vector<bool>& v) {
+    n = v.size();
+    for (unsigned i = 0; i < v.size(); ++i) stuff[i] = v[i];
+  }
+};
+
+struct FakeColorVector {
+  unsigned n;
+  Color stuff[MAX];
+
+  void fill_stuff(const vector<Color>& v) {
+    n = v.size();
+    for (unsigned i = 0; i < v.size(); ++i) stuff[i] = v[i];
+  }
+};
+
 // Common definition of application state
 //
 struct State {
-  FakeVector fishZeroPosComm;
+  FakePoseVector fishZeroPosComm;
   FakeVector planktonPosComm;
-  Vec3f userFishPosition;
-  Pose ghostNetComm;
+  FakeBoolVector fishZeroAliveComm;
+  FakeColorVector fishZeroColorComm;
+
+  Nav userFishNav;
+  Nav ghostNetNav;
+  al::Mesh::Vertices ghostNetVerts;
+
   float parNearTargetTemp;
 
   // FakeVector colors;
