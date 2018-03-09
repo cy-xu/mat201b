@@ -57,12 +57,18 @@ struct FakeColorVector {
 //
 struct State {
   FakePoseVector fishZeroPosComm;
-  FakeVector planktonPosComm;
   FakeBoolVector fishZeroAliveComm;
   FakeColorVector fishZeroColorComm;
 
+  FakePoseVector planktonPosesComm;
+  FakeBoolVector planktonAliveComm;
+
   Nav userFishNav;
+
   Nav ghostNetNav;
+  int ranNumsComm[4];
+  FakeVector ghostNetVertsComm;
+
   al::Mesh::Vertices ghostNetVerts;
 
   float parNearTargetTemp;

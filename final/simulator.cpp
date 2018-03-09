@@ -20,8 +20,8 @@ License: GPL-3.0
 #include "allocore/math/al_Vec.hpp"
 #include "common.hpp"
 
-using namespace al;
 using namespace std;
+using namespace al;
 
 #define TAIL_LENGTH 20
 #define OUT_BOUND 200
@@ -58,6 +58,13 @@ Mesh fishMeshS;
 Mesh fishMeshM;
 Mesh fishMeshL;
 Mesh planktonMesh;
+
+// customized random func
+int myRnd(int seed, int max, int min) {
+  rnd::Random<> rig;
+  rig.seed(seed);
+  return rig.uniform(max, min);
+}
 
 // Plankton
 struct Plankton {
@@ -426,6 +433,7 @@ struct GhostNet {
   Color color;
   double timePast;
   int total;
+  vector<Vec3f> vertices;
 
   GhostNet() {
     nav.pos() =
@@ -436,12 +444,12 @@ struct GhostNet {
     color = RGB(0.95f);
 
     // generate the shape
-    addSurface(ghostNetMesh, rnd::uniform(25, 15), rnd::uniform(50, 25),
-               rnd::uniform(50, 30), rnd::uniform(100, 50));
+    addSurface(ghostNetMesh, 20, 40, 40, 80);
 
     // randomize the vertices
     for (int i = 0; i < ghostNetMesh.vertices().size(); i++) {
-      ghostNetMesh.vertices()[i] += rnd::uniformS(5);
+      ghostNetMesh.vertices()[i] += myRnd(i, 5, -5);
+      vertices.push_back(ghostNetMesh.vertices()[i]);
     }
 
     ghostNetMesh.primitive(Graphics::LINE_LOOP);
@@ -484,7 +492,10 @@ struct GhostNet {
 
       VertV += VertA * timeStep;
       *VertPointer += VertV * timeStep;
+
+      vertices[i] = ghostNetMesh.vertices()[i];
     }
+    vertices[total - 1] = ghostNetMesh.vertices()[total - 1];
     ghostNetMesh.generateNormals();
   }
 
@@ -565,7 +576,10 @@ struct MyApp : App {
   vector<Pose> fishZeroPoses;
   vector<bool> fishZeroAlive;
   vector<Color> fishZeroColor;
-  vector<Vec3f> planktonPositions;
+
+  vector<Pose> planktonPoses;
+  vector<bool> planktonAlive;
+
   UserFish userFishZero;
   GhostNet ghostNet0;
 
@@ -644,7 +658,8 @@ struct MyApp : App {
     for (int i = 0; i < fishCount * 2; i++) {
       Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
-      planktonPositions.push_back(newPlankton.pose.pos());  // cuttlebone
+      planktonPoses.push_back(newPlankton.pose);   // cuttlebone
+      planktonAlive.push_back(newPlankton.alive);  // cuttlebone
     }
 
     initWindow();
@@ -679,7 +694,10 @@ struct MyApp : App {
     ghostNet0.wiggle(dt);
     ghostNet0.flowInSea(fishZeroList, userFishZero);
     ghostNet0.update();
-    appState.ghostNetNav = ghostNet0.nav;  // cuttlebone
+
+    appState.ghostNetNav = ghostNet0.nav;                       // cuttlebone
+    appState.ghostNetVertsComm.fill_stuff(ghostNet0.vertices);  // cuttlebone
+
     // appState.ghostNetVerts = ghostNet0.ghostNetMesh.vertices();
 
     // fish animation
@@ -751,8 +769,10 @@ struct MyApp : App {
     for (int i = 0; i < planktonList.size(); ++i) {
       planktonList[i].update();
       // cuttlebone plankton
-      planktonPositions[i] = planktonList[i].pose.pos();
-      appState.planktonPosComm.fill_stuff(planktonPositions);
+      planktonPoses[i] = planktonList[i].pose;
+      planktonAlive[i] = planktonList[i].alive;
+      appState.planktonPosesComm.fill_stuff(planktonPoses);
+      appState.planktonAliveComm.fill_stuff(planktonAlive);
     }
 
     maker.set(appState);  // cuttlebone

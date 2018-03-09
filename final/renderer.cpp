@@ -37,6 +37,7 @@ double timeStep = 0.01;        // keys change this value for effect
 double scaleFactor = 0.1;      // resizes the entire scene
 double sphereRadius = 2;       // increase this to make collisions more frequent
 int targetFishID = 0;
+int ranNums[4];
 
 // global variables for sound
 float targetToNav;
@@ -58,6 +59,13 @@ Mesh fishMeshS;
 Mesh fishMeshM;
 Mesh fishMeshL;
 Mesh planktonMesh;
+
+// customized random func
+int myRnd(int seed, int max, int min) {
+  rnd::Random<> rig;
+  rig.seed(seed);
+  return rig.uniform(max, min);
+}
 
 // Plankton
 struct Plankton {
@@ -90,28 +98,6 @@ struct Plankton {
     id = i;
   }
 
-  void update() {
-    if (alive == false) {
-      pose.pos() = Vec3f(0, 100000, 0);
-    } else {
-      // since *particles is inside class, no need to bring into the
-      // functions.
-      Vec3f sep = separate();
-      Vec3f stay = stayInCircle();
-
-      sep = sep * 1.5f;
-      stay = stay * 0.1f;
-
-      applyForce(sep);
-      applyForce(stay);
-
-      velocity += acceleration * timeStep;
-      pose.pos() += velocity * timeStep;
-
-      acceleration.zero();  // reset acceleration after each update
-    }
-  }
-
   void draw(Graphics &g) {
     g.pushMatrix();
     g.translate(pose.pos());
@@ -120,44 +106,6 @@ struct Plankton {
     g.draw(planktonMesh);
     g.popMatrix();
   }
-
-  Vec3f separate() {
-    int count = 0;
-    Vec3f steer;
-
-    for (auto other : *planktons) {
-      // this difference is a vector from b to a, put this force on a, so
-      // push away.
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      // if agents is getting closer, push away
-      if (d > 0 && d < 20 * sphereRadius) {
-        steer += difference.normalize() / d;
-        count++;
-      }
-    }
-    if (count > 0) {
-      steer = steer / count;
-    }
-    if (steer.mag() > 0) {
-      steer = steer.normalize() * maxSpeed;
-      steer -= velocity;
-    }
-    return steer;
-  }
-
-  Vec3f seek(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    Vec3f steer = desired.normalize(maxSpeed);
-    steer -= velocity;
-    return steer;
-  }
-
-  void eaten() { alive = false; }
-
-  Vec3f stayInCircle() { return seek(rnd::ball<Vec3f>() * 20.0f * initRadius); }
-
-  void applyForce(Vec3f force) { acceleration += force; }
 };
 
 // NormalFish
@@ -194,38 +142,6 @@ struct Fish {
     id = i;
   }
 
-  void update() {
-    if (alive == false) {
-      pose.pos() = Vec3f(0, 0, 10000);
-    } else {
-      // since *particles is inside class, no need to bring into the
-      // functions.
-      Vec3f sep = separate();
-      Vec3f ali = align();
-      Vec3f coh = cohesion();
-      Vec3f stay = stayInCircle();
-
-      // 4 * sphereRadius, 10 * sphereRadius, 30 * sphereRadius
-      // 1.0 , 1.0 , 1.0 is an interesting stable combination
-
-      sep = sep * 2.5f;
-      ali = ali * 2.0f;
-      coh = coh * 1.0f;
-      stay = stay * 1.0f;
-
-      applyForce(sep);
-      applyForce(ali);
-      applyForce(coh);
-      // applyForce(stay);
-
-      velocity += acceleration * timeStep;
-      pose.pos() += velocity * timeStep;
-
-      acceleration.zero();  // reset acceleration after each update
-      targetP_diff = 10000.f;
-    }
-  }
-
   void draw(Graphics &g) {
     g.pushMatrix();
     g.translate(pose.pos());
@@ -240,118 +156,6 @@ struct Fish {
     }
     g.popMatrix();
   }
-
-  Vec3f separate() {
-    int count = 0;
-    Vec3f steer;
-
-    for (auto other : *fishes) {
-      // this difference is a vector from b to a, put this force on a, so
-      // push away.
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      // if agents is getting closer, push away
-      if (d > 0 && d < 6 * sphereRadius) {
-        steer += difference.normalize() / d;
-        count++;
-      }
-    }
-    if (count > 0) {
-      steer = steer / count;
-    }
-    if (steer.mag() > 0) {
-      steer = steer.normalize() * maxSpeed;
-      steer -= velocity;
-    }
-    return steer;
-  }
-
-  Vec3f align() {
-    int count = 0;
-    Vec3f steer;
-    Vec3f sum;
-
-    for (auto other : *fishes) {
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      if (d > 0 && d < 60 * sphereRadius) {
-        sum += other.acceleration;
-        count++;
-      }
-    }
-    if (count > 0) {
-      sum = sum / count;
-      sum.normalize(maxSpeed);
-      steer = sum - velocity;
-      return steer;
-    } else {
-      return Vec3f(0, 0, 0);
-    }
-  }
-
-  Vec3f cohesion() {
-    int count = 0;
-    Vec3f sum;
-    // Quat<float> sumQuat;
-
-    for (auto other : *fishes) {
-      Vec3f difference = (pose.pos() - other.pose.pos());
-      float d = difference.mag();
-      if (d > 0 && d < 60 * sphereRadius) {
-        sum += other.pose.pos();
-        // sumQuat += other.pose.quat();
-        count++;
-      }
-    }
-    if (count > 0) {
-      sum = sum / count;
-      // sumQuat = sumQuat / count;
-      // pose.lerp(sumQuat, 0.1);
-      // pose.slerpTo(sumQuat, 0.1);
-      sum.normalize(maxSpeed);
-      return seek(sum);
-    } else {
-      return Vec3f(0, 0, 0);
-    }
-  }
-
-  Vec3f seek(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    Vec3f steer = desired.normalize(maxSpeed);
-    steer -= velocity;
-    return steer;
-  }
-
-  void eaten() { alive = false; }
-
-  void seekTarget(Vec3f target) {
-    Vec3f steer = seek(target).normalize();
-    steer = steer * maxSpeed;
-    applyForce(steer);
-  }
-
-  void runAway(Vec3f target) {
-    Vec3f desired = target - pose.pos();
-    Vec3f steer = -(desired.normalize() * maxSpeed);
-    steer = (steer - velocity) * 20.0f;
-    applyForce(steer);
-  }
-
-  Vec3f stayInCircle() {
-    // needs a way to normalize the .mag()
-    float d = pose.pos().mag();
-    if (d > OUT_BOUND) {
-      return seek(Vec3f(0, 0, 0));
-    } else
-      // return seek(Vec3f(pose.pos().x + 10 * velocity.x,
-      //                   rnd::uniform(initRadius),
-      //                   pose.pos().z + 10 * velocity.z));
-      return seek(rnd::ball<Vec3f>() * 2 * initRadius);
-    // return seek(Vec3f(velocity.x, rnd::uniformS(initRadius * 2),
-    // velocity.z));
-  }
-
-  void applyForce(Vec3f force) { acceleration += force; }
 };
 
 // UserFish
@@ -393,29 +197,6 @@ struct UserFish {
     nav.pos() += velocity * timeStep;
     acceleration.zero();  // reset acceleration after each update
   }
-
-  void findNewTarget(vector<Fish> fishes) {
-    float nearestFish = 10000.f;
-    for (auto fish : fishes) {
-      float d = (nav.pos() - fish.pose.pos()).mag();
-      if (d > 300 && d < nearestFish) {
-        nearestFish = d;
-        // targetQuat = fish.pose.quat();
-        // targetPos = fish.pose.pos();
-        targetFishID = fish.id;
-      }
-    }
-  }
-
-  void seekTarget(Vec3f targetPos) {
-    Vec3f desired = targetPos - nav.pos();
-    Vec3f steer = desired.normalize() * maxAcceleration;
-    // Vec3f steer = desired.normalize() * maxSpeed;
-    steer = steer - velocity;
-    applyForce(steer);
-  }
-
-  void applyForce(Vec3f force) { acceleration += force; }
 };
 
 // Ghost net
@@ -426,28 +207,39 @@ struct GhostNet {
   Color color;
   double timePast;
   int total;
+  vector<Vec3f> vertices;
 
   GhostNet() {
     nav.pos() =
         Vec3f(rnd::uniform(100), rnd::uniform(400, 100), rnd::uniform(100));
-    nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
-                   float(rnd::uniform()), float(rnd::uniform()));
+    // nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
+    //                float(rnd::uniform()), float(rnd::uniform()));
     velocity = Vec3f(0, 0, 0);
     color = RGB(0.95f);
 
     // generate the shape
-    addSurface(ghostNetMesh, rnd::uniform(25, 15), rnd::uniform(50, 25),
-               rnd::uniform(50, 30), rnd::uniform(100, 50));
+    addSurface(ghostNetMesh, 20, 40, 40, 80);
 
     // randomize the vertices
     for (int i = 0; i < ghostNetMesh.vertices().size(); i++) {
-      ghostNetMesh.vertices()[i] += rnd::uniformS(5);
+      ghostNetMesh.vertices()[i] += myRnd(i, 5, -5);
+      vertices.push_back(ghostNetMesh.vertices()[i]);
     }
 
     ghostNetMesh.primitive(Graphics::LINE_LOOP);
     ghostNetMesh.generateNormals();
 
     total = ghostNetMesh.vertices().size();
+  }
+
+  void draw(Graphics &g) {
+    g.pushMatrix();
+    g.translate(nav.pos());
+    g.rotate(nav.quat());
+    g.color(color);
+    g.draw(ghostNetMesh);
+    g.popMatrix();
+    // g.draw(tentacles);
   }
 
   void wiggle(double dt) {
@@ -477,7 +269,7 @@ struct GhostNet {
         steer = diff - VertV;
       } else {
         midd -= midd - ghostNetMesh.vertices()[i];
-        midd.normalize(maxSpeed);
+        midd.normalize(maxAcceleration);
         steer = midd;
       }
       VertA += steer;
@@ -486,51 +278,6 @@ struct GhostNet {
       *VertPointer += VertV * timeStep;
     }
     ghostNetMesh.generateNormals();
-  }
-
-  void flowInSea(vector<Fish> fishes, UserFish userFish) {
-    int count = 0;
-    Vec3f steer;
-    Vec3f sum;
-
-    nav.quat().slerpTo(userFish.nav.quat(), 0.001);
-
-    for (auto fish : fishes) {
-      Vec3f diff = (nav.pos() - fish.pose.pos()).mag();
-      if (diff > 0 && diff < 100 * sphereRadius) {
-        sum += fish.acceleration;
-        count++;
-      }
-    }
-    if (count > 0) {
-      sum = sum / count;
-      sum.normalize(maxSpeed / 2);
-      steer = sum - velocity;
-      applyForce(steer);
-    }
-    if (nav.pos().y > 0) {
-      applyForce(Vec3f(0, -5, 0));
-    } else {
-      applyForce(Vec3f(0, 3, 0));
-    }
-  }
-
-  void applyForce(Vec3f force) { acceleration += force; }
-
-  void update() {
-    velocity += acceleration * timeStep;
-    nav.pos() += velocity * timeStep;
-    acceleration.zero();  // reset acceleration after each update
-  }
-
-  void draw(Graphics &g) {
-    g.pushMatrix();
-    g.translate(nav.pos());
-    g.rotate(nav.quat());
-    g.color(color);
-    g.draw(ghostNetMesh);
-    g.popMatrix();
-    // g.draw(tentacles);
   }
 };
 
@@ -563,6 +310,7 @@ struct MyApp : App {
   vector<Fish> fishZeroList;
   vector<Plankton> planktonList;
   UserFish userFishZero;
+
   GhostNet ghostNet0;
 
   // for sound
@@ -641,7 +389,6 @@ struct MyApp : App {
 
     initWindow();
     initAudio();
-    userFishZero.findNewTarget(fishZeroList);
   }
 
   void onAnimate(double dt) {
@@ -664,65 +411,15 @@ struct MyApp : App {
     userFishZero.nav = appState.userFishNav;  // cuttlebone
 
     // ghost net animation
-    ghostNet0.wiggle(dt);
     ghostNet0.nav = appState.ghostNetNav;
-    // ghostNet0.ghostNetMesh.vertices() = appState.ghostNetVerts;
+    for (int i = 0; i < ghostNet0.total; i++) {
+      ghostNet0.vertices[i] = appState.ghostNetVertsComm.stuff[i];
+      ghostNet0.ghostNetMesh.vertices()[i] = ghostNet0.vertices[i];
+    }
+    // ghostNet0.wiggle(dt);
 
     // fish animation
     for (int i = 0; i < fishZeroList.size(); ++i) {
-      Fish me = fishZeroList[i];
-
-      Vec3d *mePosPointer;
-      mePosPointer = &me.pose.pos();
-
-      me.update();
-
-      // get distance between user fish
-      Vec3f diff_predator = me.pose.pos() - userFishZero.nav.pos();
-      float d2 = diff_predator.mag();
-
-      // run away from predator
-      if (d2 < 60 * sphereRadius) {
-        if (i != targetFishID) {
-          me.runAway(userFishZero.nav.pos());
-        }
-      }
-      // mark nearby fish dead
-      if (d2 < 3 * sphereRadius) {
-        me.eaten();
-      }
-
-      if (d2 < 30 * sphereRadius) {
-        nearbyFish += 1;
-      }
-
-      // ghost net catching fish
-      for (int i = 0; i < ghostNet0.ghostNetMesh.vertices().size(); i++) {
-        Vec3f &position = ghostNet0.ghostNetMesh.vertices()[i];
-        float d = (me.pose.pos() - position).mag();
-        if (d < 3 * sphereRadius) {
-          *mePosPointer = Vec3d(position.x, position.y, position.z);
-        }
-      }
-
-      ///////// this is causing a bug
-      me.targetP_diff = 10000.f;  // reset target diff to 10000;
-      for (int ii = 0; ii < planktonList.size(); ii++) {
-        float p_diff = (me.pose.pos() - planktonList[ii].pose.pos()).mag();
-        if (p_diff < me.targetP_diff) {
-          me.targetP_diff = p_diff;
-          me.targetID = ii;
-        }
-      }
-      if (me.targetP_diff > 2 * sphereRadius) {
-        me.seekTarget(planktonList[me.targetID].pose.pos());
-        me.pose.faceToward(planktonList[me.targetID].pose.pos(), 0.01);
-      } else {
-        planktonList[me.targetID].eaten();
-      }
-
-      fishZeroList[i] = me;
-
       // cuttlebone fish
       fishZeroList[i].pose = appState.fishZeroPosComm.stuff[i];
       fishZeroList[i].alive = appState.fishZeroAliveComm.stuff[i];
@@ -731,11 +428,8 @@ struct MyApp : App {
 
     // plankton animation
     for (int i = 0; i < planktonList.size(); ++i) {
-      // planktonList[i].update();
-      // cuttlebone plankton
-      planktonList[i].pose.pos().x = appState.planktonPosComm.stuff[i].x;
-      planktonList[i].pose.pos().y = appState.planktonPosComm.stuff[i].y;
-      planktonList[i].pose.pos().z = appState.planktonPosComm.stuff[i].z;
+      planktonList[i].pose = appState.planktonPosesComm.stuff[i];
+      planktonList[i].alive = appState.planktonAliveComm.stuff[i];
     }
 
     // how close is the target to viewer
@@ -787,56 +481,6 @@ struct MyApp : App {
     userFishZero.draw(g);
     ghostNet0.draw(g);
     g.popMatrix();
-  }
-
-  void onKeyDown(const ViewpointWindow &, const Keyboard &k) {
-    float targetPosition = 10;
-    switch (k.key()) {
-      default:
-      case 'u':
-        userFishZero.nav.pos().y += targetPosition;
-        break;
-      case 'j':
-        userFishZero.nav.pos().y -= targetPosition;
-        break;
-      case 'h':
-        userFishZero.nav.pos().x -= targetPosition;
-        break;
-      case 'k':
-        userFishZero.nav.pos().x += targetPosition;
-        break;
-      case '1':
-        // reverse time
-        timeStep *= -1;
-        break;
-      case '2':
-        // speed up time
-        if (timeStep < 1) timeStep *= 2;
-        break;
-      case '3':
-        // slow down time
-        if (timeStep > 0.0005) timeStep /= 2;
-        break;
-      case '4':
-        // pause the simulation
-        //   simulate = !simulate;
-        break;
-      case '5':
-        // change auto/manual control
-        if (userFishZero.autoMode)
-          userFishZero.autoMode = false;
-        else
-          userFishZero.autoMode = true;
-        break;
-    }
-  }
-  virtual void onMouseDown(const ViewpointWindow &w, const Mouse &m) {
-    // normalize mouse position from -1.0 to 1.0
-    float x = float(m.x()) / w.width() * 2.f - 1.f;
-    float y = (float(m.y()) / w.height() * 2.f - 1.f) * -1.f;
-
-    // move light with mouse
-    light.pos(Vec3f(x, y, 1.f) * 10.f);
   }
 
   // virtual void onSound(AudioIOData &io) {
