@@ -18,6 +18,7 @@ License: GPL-3.0
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Ray.hpp"
 #include "allocore/math/al_Vec.hpp"
+#include "alloutil/al_OmniStereoGraphicsRenderer.hpp"
 #include "common.hpp"
 
 using namespace al;
@@ -292,6 +293,7 @@ string fullPathOrDie(string fileName, string whereToLook = ".") {
 // MyApp
 /////////////////////////////
 struct MyApp : App {
+  // struct MyApp : OmniStereoGraphicsRenderer {
   // Cuttlebone
   State appState;
   cuttlebone::Taker<State> taker;
@@ -388,7 +390,7 @@ struct MyApp : App {
     }
 
     initWindow();
-    initAudio();
+    // initAudio();
   }
 
   void onAnimate(double dt) {

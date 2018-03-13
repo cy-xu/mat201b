@@ -15,6 +15,7 @@ License: GPL-3.0
 #include <cassert>  // gets you assert()
 #include "Cuttlebone/Cuttlebone.hpp"
 #include "Gamma/Oscillator.h"
+#include "Gamma/SamplePlayer.h"
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Ray.hpp"
 #include "allocore/math/al_Vec.hpp"
@@ -584,8 +585,10 @@ struct MyApp : App {
   GhostNet ghostNet0;
 
   // for sound
-  gam::SineD<> sined;
-  gam::Accum<> timer;
+  // gam::SineD<> sined;
+  // gam::Accum<> timer;
+  gam::SamplePlayer<> eatSound;  // Uses linear interpolation
+  // bool soundPlaying = false;
 
   MyApp() : maker("255.255.255.255") {
     light.pos(0, 0, 0);   // place the light
@@ -662,6 +665,11 @@ struct MyApp : App {
       planktonAlive.push_back(newPlankton.alive);  // cuttlebone
     }
 
+    // for audio
+    // Load sound file into buffer
+    eatSound.load(fullPathOrDie("water3.wav").c_str());
+    eatSound.finish();
+
     initWindow();
     initAudio();
     userFishZero.findNewTarget(fishZeroList);
@@ -722,6 +730,8 @@ struct MyApp : App {
       // mark nearby fish dead
       if (d2 < 3 * sphereRadius) {
         me.eaten();
+        // soundPlaying = true;
+        eatSound.reset();
       }
 
       if (d2 < 30 * sphereRadius) {
@@ -752,6 +762,7 @@ struct MyApp : App {
         me.pose.faceToward(planktonList[me.targetID].pose.pos(), 0.01);
       } else {
         planktonList[me.targetID].eaten();
+        eatSound.reset();
       }
 
       fishZeroList[i] = me;
@@ -778,9 +789,9 @@ struct MyApp : App {
     maker.set(appState);  // cuttlebone
 
     // how close is the target to viewer
-    Vec3f diff_nav = nav().pos() - userFishZero.nav.pos();
-    targetToNav = diff_nav.mag();  // it ranges from 50 - 100
-    timer.freq(nearbyFish);
+    // Vec3f diff_nav = nav().pos() - userFishZero.nav.pos();
+    // targetToNav = diff_nav.mag();  // it ranges from 50 - 100
+    // timer.freq(nearbyFish);
   }
 
   void onDraw(Graphics &g, const Viewpoint &v) {
@@ -878,18 +889,21 @@ struct MyApp : App {
     light.pos(Vec3f(x, y, 1.f) * 10.f);
   }
 
-  // virtual void onSound(AudioIOData &io) {
-  //   gam::Sync::master().spu(audioIO().fps());
-  //   while (io()) {
-  //     if (timer()) {
-  //       // sined.set(rnd::uniform(220.0f, 880.0f), 0.5f, 1.0f);
-  //       sined.set(1000.0f - targetToNav * 6, 0.5f, 1.0f);
-  //     }
-  //     float s = sined();
-  //     io.out(0) = s;
-  //     io.out(1) = s;
-  //   }
-  // }
+  virtual void onSound(AudioIOData &io) {
+    gam::Sync::master().spu(audioIO().fps());
+    while (io()) {
+      // if (timer()) {
+      //   // sined.set(rnd::uniform(220.0f, 880.0f), 0.5f, 1.0f);
+      //   sined.set(1000.0f - targetToNav * 6, 0.5f, 1.0f);
+      // }
+      // float s = sined();
+      // io.out(0) = s;
+      // io.out(1) = s;
+
+      // if (soundPlaying) {
+      io.out(0) = io.out(1) = eatSound();
+    }
+  }
 };
 
 int main() {
