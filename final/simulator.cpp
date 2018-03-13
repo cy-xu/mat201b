@@ -442,7 +442,7 @@ struct GhostNet {
     // nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
     //                float(rnd::uniform()), float(rnd::uniform()));
     velocity = Vec3f(0, 0, 0);
-    color = RGB(0.95f);
+    color = RGB(0.9f);
 
     // generate the shape
     addSurface(ghostNetMesh, 20, 40, 40, 80);
@@ -690,7 +690,7 @@ struct MyApp : App {
 
     // userFish animation
     userFishZero.update();
-    appState.userFishNav = userFishZero.nav;  // cuttlebone
+    appState.userFishPose = userFishZero.nav;  // cuttlebone
     // if (userFishZero.autoMode) {
     userFishZero.seekTarget(fishZeroList[targetFishID].pose.pos());
     userFishZero.nav.faceToward(fishZeroList[targetFishID].pose.pos(), 0.05);
@@ -703,7 +703,7 @@ struct MyApp : App {
     ghostNet0.flowInSea(fishZeroList, userFishZero);
     ghostNet0.update();
 
-    appState.ghostNetNav = ghostNet0.nav;                       // cuttlebone
+    appState.ghostNetPose = ghostNet0.nav;                      // cuttlebone
     appState.ghostNetVertsComm.fill_stuff(ghostNet0.vertices);  // cuttlebone
 
     // appState.ghostNetVerts = ghostNet0.ghostNetMesh.vertices();

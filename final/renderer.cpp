@@ -162,7 +162,7 @@ struct Fish {
 // UserFish
 struct UserFish {
   Vec3f velocity, acceleration, lastPos;
-  Nav nav;
+  Pose pose;
   Color color;
   Mesh tentacles;
   bool autoMode;
@@ -170,7 +170,7 @@ struct UserFish {
   // Vec3f targetPos;
 
   UserFish() {
-    nav.pos() = Vec3f(0, 0, 0) * initRadius * 2;
+    pose.pos() = Vec3f(0, 0, 0) * initRadius * 2;
     velocity = Vec3f(0, 0, 0);
     velocity = Vec3f(0, 0, 0);
     color = RGB(1);
@@ -185,8 +185,8 @@ struct UserFish {
 
   void draw(Graphics &g) {
     g.pushMatrix();
-    g.translate(nav.pos());
-    g.rotate(nav.quat());
+    g.translate(pose.pos());
+    g.rotate(pose.quat());
     g.color(color);
     g.draw(userFishMesh);
     g.popMatrix();
@@ -195,7 +195,7 @@ struct UserFish {
 
   void update() {
     velocity += acceleration * timeStep;
-    nav.pos() += velocity * timeStep;
+    pose.pos() += velocity * timeStep;
     acceleration.zero();  // reset acceleration after each update
   }
 };
@@ -204,19 +204,19 @@ struct UserFish {
 struct GhostNet {
   Mesh ghostNetMesh, boundingBoxMesh;
   Vec3f velocity, acceleration, center;
-  Nav nav;
+  Pose pose;
   Color color;
   double timePast;
   int total;
   vector<Vec3f> vertices;
 
   GhostNet() {
-    nav.pos() =
+    pose.pos() =
         Vec3f(rnd::uniform(100), rnd::uniform(400, 100), rnd::uniform(100));
     // nav.quat().set(float(rnd::uniform()), float(rnd::uniform()),
     //                float(rnd::uniform()), float(rnd::uniform()));
     velocity = Vec3f(0, 0, 0);
-    color = RGB(0.95f);
+    color = RGB(0.9f);
 
     // generate the shape
     addSurface(ghostNetMesh, 20, 40, 40, 80);
@@ -235,8 +235,8 @@ struct GhostNet {
 
   void draw(Graphics &g) {
     g.pushMatrix();
-    g.translate(nav.pos());
-    g.rotate(nav.quat());
+    g.translate(pose.pos());
+    g.rotate(pose.quat());
     g.color(color);
     g.draw(ghostNetMesh);
     g.popMatrix();
@@ -292,8 +292,7 @@ string fullPathOrDie(string fileName, string whereToLook = ".") {
 
 // MyApp
 /////////////////////////////
-struct MyApp : App {
-  // struct MyApp : OmniStereoGraphicsRenderer {
+struct MyApp : OmniStereoGraphicsRenderer {
   // Cuttlebone
   State appState;
   cuttlebone::Taker<State> taker;
@@ -320,9 +319,9 @@ struct MyApp : App {
   gam::Accum<> timer;
 
   MyApp() {
-    light.pos(0, 0, 0);   // place the light
-    nav().pos(0, 0, 50);  // place the viewer
-    background(Color(0.1));
+    light.pos(0, 0, 0);  // place the light
+    pose.pos(0, 0, 50);  // place the viewer
+    // background(Color(0.1));
 
     // set near/far clip
     lens().near(0.1);
@@ -407,13 +406,13 @@ struct MyApp : App {
       return;
 
     // light position
-    light.pos(userFishZero.nav.pos());
+    light.pos(userFishZero.pose.pos());
 
     // userFish animation
-    userFishZero.nav = appState.userFishNav;  // cuttlebone
+    userFishZero.pose = appState.userFishPose;  // cuttlebone
 
     // ghost net animation
-    ghostNet0.nav = appState.ghostNetNav;
+    ghostNet0.pose = appState.ghostNetPose;
     for (int i = 0; i < ghostNet0.total; i++) {
       ghostNet0.vertices[i] = appState.ghostNetVertsComm.stuff[i];
       ghostNet0.ghostNetMesh.vertices()[i] = ghostNet0.vertices[i];
@@ -435,12 +434,15 @@ struct MyApp : App {
     }
 
     // how close is the target to viewer
-    Vec3f diff_nav = nav().pos() - userFishZero.nav.pos();
+    Vec3f diff_nav = pose.pos() - userFishZero.pose.pos();
     targetToNav = diff_nav.mag();  // it ranges from 50 - 100
     timer.freq(nearbyFish);
   }
 
-  void onDraw(Graphics &g, const Viewpoint &v) {
+  void onDraw(Graphics &g) {
+    shader().uniform("texture", 1.0);
+    shader().uniform("lighting", 1.0);
+
     // draw background textured sphere centered at nav
     // turn off lighting
     g.lighting(false);
@@ -448,7 +450,7 @@ struct MyApp : App {
     g.depthMask(false);
 
     g.pushMatrix();
-    g.translate(nav().pos());
+    g.translate(pose.pos());
     g.rotate(180, 0, 0, 1);
     bgTexture.bind();
     g.color(1, 1, 1);

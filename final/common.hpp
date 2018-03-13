@@ -1,12 +1,10 @@
 #ifndef __COMMON__
 #define __COMMON__
 
-#include "allocore/io/al_App.hpp"
-using namespace al;
-
 #include <iostream>
 #include <type_traits>
 #include <vector>
+#include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Random.hpp"
 #include "allocore/math/al_Vec.hpp"
 using namespace std;
@@ -63,9 +61,11 @@ struct State {
   FakePoseVector planktonPosesComm;
   FakeBoolVector planktonAliveComm;
 
-  Nav userFishNav;
+  // Nav userFishNav;
+  Pose userFishPose;
 
-  Nav ghostNetNav;
+  // Nav ghostNetNav;
+  Pose ghostNetPose;
   int ranNumsComm[4];
   FakeVector ghostNetVertsComm;
 
