@@ -320,8 +320,9 @@ struct MyApp : OmniStereoGraphicsRenderer {
 
   MyApp() {
     light.pos(0, 0, 0);  // place the light
-    pose.pos(0, 0, 50);  // place the viewer
+    pose.pos(0, 0, 0);   // place the viewer
     // background(Color(0.1));
+    omni().clearColor() = Color(0.15);
 
     // set near/far clip
     lens().near(0.1);
@@ -383,7 +384,7 @@ struct MyApp : OmniStereoGraphicsRenderer {
       fishZeroList.push_back(newFish);
     }
 
-    for (int i = 0; i < fishCount * 2; i++) {
+    for (int i = 0; i < fishCount * 5; i++) {
       Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
     }
@@ -398,8 +399,13 @@ struct MyApp : OmniStereoGraphicsRenderer {
     myFrameRate = 1 / dt;
     // cout << "Current Frame Rate: " << myFrameRate << endl;
 
-    // get data from common
+    // get data from common, skip all until we heard at least once from the sim
     taker.get(appState);
+    // static bool hasNeverHeardFromSim = true;
+    // if (taker.get(appState) > 0) {
+    //   hasNeverHeardFromSim = false;
+    // }
+    // if (hasNeverHeardFromSim) return;
 
     if (!simulate)
       // skip the rest of this function

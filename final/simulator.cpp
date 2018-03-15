@@ -556,7 +556,7 @@ string fullPathOrDie(string fileName, string whereToLook = ".") {
 
 // MyApp
 /////////////////////////////
-struct MyApp : App {
+struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
   // Cuttlebone
   State appState;
   cuttlebone::Maker<State> maker;
@@ -590,9 +590,11 @@ struct MyApp : App {
   gam::SamplePlayer<> eatSound;  // Uses linear interpolation
   // bool soundPlaying = false;
 
-  MyApp() : maker("255.255.255.255") {
-    light.pos(0, 0, 0);   // place the light
-    nav().pos(0, 0, 50);  // place the viewer
+  MyApp()
+      : maker(Simulator::defaultBroadcastIP()),
+        InterfaceServerClient(Simulator::defaultInterfaceServerIP()) {
+    light.pos(0, 0, 0);  // place the light
+    nav().pos(0, 0, 0);  // place the viewer
     background(Color(0.1));
 
     // set near/far clip
@@ -658,7 +660,7 @@ struct MyApp : App {
       fishZeroColor.push_back(newFish.color);  // cuttlebone
     }
 
-    for (int i = 0; i < fishCount * 2; i++) {
+    for (int i = 0; i < fishCount * 5; i++) {
       Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
       planktonPoses.push_back(newPlankton.pose);   // cuttlebone
@@ -671,11 +673,26 @@ struct MyApp : App {
     eatSound.finish();
 
     initWindow();
-    initAudio();
+    // initAudio();
+
+    // audio
+    AlloSphereAudioSpatializer::initAudio();
+    AlloSphereAudioSpatializer::initSpatialization();
+    // if gamma
+    gam::Sync::master().spu(AlloSphereAudioSpatializer::audioIO().fps());
+    scene()->addSource(aSoundSource);
+    aSoundSource.dopplerType(DOPPLER_NONE);
+    // scene()->usePerSampleProcessing(true);
+    scene()->usePerSampleProcessing(false);
+
+    // initialize a new target
     userFishZero.findNewTarget(fishZeroList);
   }
 
   void onAnimate(double dt) {
+    while (InterfaceServerClient::oscRecv().recv())
+      ;  // XXX
+
     // reset two variable for sound
     nearbyFish = 0;
     myFrameRate = 1 / dt;
@@ -889,8 +906,9 @@ struct MyApp : App {
     light.pos(Vec3f(x, y, 1.f) * 10.f);
   }
 
+  SoundSource aSoundSource;
   virtual void onSound(AudioIOData &io) {
-    gam::Sync::master().spu(audioIO().fps());
+    aSoundSource.pose(nav());
     while (io()) {
       // if (timer()) {
       //   // sined.set(rnd::uniform(220.0f, 880.0f), 0.5f, 1.0f);
@@ -901,13 +919,23 @@ struct MyApp : App {
       // io.out(1) = s;
 
       // if (soundPlaying) {
-      io.out(0) = io.out(1) = eatSound();
+
+      // XXX -- this is broken the line below should work, but it sounds
+      // terrible
+      aSoundSource.writeSample(eatSound());
+      //
+      // these two lines should go onces the lien above works
+      // io.out(0) = io.out(1) = eatSound();
     }
+    listener()->pose(nav());
+    scene()->render(io);
   }
 };
 
 int main() {
   MyApp app;
+  app.AlloSphereAudioSpatializer::audioIO().start();
+  app.InterfaceServerClient::connect();
   app.maker.start();
   app.start();
 }

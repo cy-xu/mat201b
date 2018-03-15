@@ -7,6 +7,8 @@
 #include "allocore/io/al_App.hpp"
 #include "allocore/math/al_Random.hpp"
 #include "allocore/math/al_Vec.hpp"
+#include "alloutil/al_AlloSphereAudioSpatializer.hpp"
+#include "alloutil/al_Simulator.hpp"
 using namespace std;
 using namespace al;
 
