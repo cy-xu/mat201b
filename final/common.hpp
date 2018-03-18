@@ -75,6 +75,8 @@ struct State {
 
   float parNearTargetTemp;
 
+  Pose navPose;
+
   // FakeVector colors;
   // vector<Color> particleColors;
   // vector<Pose> particlePoses;
