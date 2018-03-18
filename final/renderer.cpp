@@ -386,7 +386,7 @@ struct MyApp : OmniStereoGraphicsRenderer {
       fishZeroList.push_back(newFish);
     }
 
-    for (int i = 0; i < fishCount * 5; i++) {
+    for (int i = 0; i < fishCount * 3; i++) {
       Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
     }
@@ -483,6 +483,8 @@ struct MyApp : OmniStereoGraphicsRenderer {
       }
     }
 
+    shader().uniform("texture", 1.0);
+    shader().uniform("color", 0.0);
     shader().uniform("lighting", 0.0);
     // draw plankton with texture
     g.pushMatrix();
@@ -495,9 +497,9 @@ struct MyApp : OmniStereoGraphicsRenderer {
     planktonTexture.unbind();
     g.popMatrix();
 
-    shader().uniform("lighting", 0.5);
+    // shader().uniform("texture", 0.0);
+    shader().uniform("lighting", 1.0);
     userFishZero.draw(g);
-    shader().uniform("lighting", 0.0);
     ghostNet0.draw(g);
     g.popMatrix();
   }

@@ -661,7 +661,7 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
       fishZeroColor.push_back(newFish.color);  // cuttlebone
     }
 
-    for (int i = 0; i < fishCount * 5; i++) {
+    for (int i = 0; i < fishCount * 3; i++) {
       Plankton newPlankton(&planktonList, i);
       planktonList.push_back(newPlankton);
       planktonPoses.push_back(newPlankton.pose);   // cuttlebone
