@@ -812,6 +812,7 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
       appState.planktonAliveComm.fill_stuff(planktonAlive);
     }
 
+    appState.navPose = nav();
     maker.set(appState);  // cuttlebone
 
     // how close is the target to viewer

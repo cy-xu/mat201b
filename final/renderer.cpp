@@ -144,10 +144,12 @@ struct Fish {
   }
 
   void draw(Graphics &g) {
+    //    cout << color.r << "," << color.g << "," << color.b << endl;
     g.pushMatrix();
     g.translate(pose.pos());
     g.rotate(pose.quat());
     g.color(color);
+
     if (id % 5 == 0) {
       g.draw(fishMeshS);
     } else if (id % 2 == 0) {
@@ -401,6 +403,7 @@ struct MyApp : OmniStereoGraphicsRenderer {
 
     // get data from common, skip all until we heard at least once from the sim
     taker.get(appState);
+    pose = appState.navPose;
     // static bool hasNeverHeardFromSim = true;
     // if (taker.get(appState) > 0) {
     //   hasNeverHeardFromSim = false;
@@ -447,7 +450,7 @@ struct MyApp : OmniStereoGraphicsRenderer {
 
   void onDraw(Graphics &g) {
     shader().uniform("texture", 1.0);
-    shader().uniform("lighting", 1.0);
+    shader().uniform("lighting", 0.0);
 
     // draw background textured sphere centered at nav
     // turn off lighting
@@ -466,17 +469,21 @@ struct MyApp : OmniStereoGraphicsRenderer {
 
     g.depthMask(true);  // turn depth mask back on
 
+    shader().uniform("texture", 0.0);
+    shader().uniform("lighting", 0.5);
     // draw original scene here
-    light();  // enable light
     material();
+    light();  // enable light
     g.pushMatrix();
     g.scale(scaleFactor);
-    for (auto fish : fishZeroList) {
+    for (auto &fish : fishZeroList) {
       if (fish.alive == true) {
+        shader().uniform("COLOR", fish.color);
         fish.draw(g);
       }
     }
 
+    shader().uniform("lighting", 0.0);
     // draw plankton with texture
     g.pushMatrix();
     planktonTexture.bind();
@@ -488,9 +495,60 @@ struct MyApp : OmniStereoGraphicsRenderer {
     planktonTexture.unbind();
     g.popMatrix();
 
+    shader().uniform("lighting", 0.5);
     userFishZero.draw(g);
+    shader().uniform("lighting", 0.0);
     ghostNet0.draw(g);
     g.popMatrix();
+  }
+
+  string vertexCode() {
+    // XXX use c++11 string literals
+    return R"(
+varying vec4 color;
+varying vec3 normal, lightDir, eyeVec;
+void main() {
+  color = gl_Color;
+  vec4 vertex = gl_ModelViewMatrix * gl_Vertex;
+  normal = gl_NormalMatrix * gl_Normal;
+  vec3 V = vertex.xyz;
+  eyeVec = normalize(-V);
+  lightDir = normalize(vec3(gl_LightSource[0].position.xyz - V));
+  gl_TexCoord[0] = gl_MultiTexCoord0;
+  gl_Position = omni_render(vertex);
+}
+)";
+  }
+
+  string fragmentCode() {
+    return R"(
+uniform float lighting;
+uniform float texture;
+uniform vec4 COLOR;
+uniform sampler2D texture0;
+varying vec4 color;
+varying vec3 normal, lightDir, eyeVec;
+void main() {
+  vec4 colorMixed;
+  if (texture > 0.0) {
+    vec4 textureColor = texture2D(texture0, gl_TexCoord[0].st);
+    colorMixed = mix(color, textureColor, texture);
+  } else {
+    //colorMixed = color;
+    colorMixed = COLOR;
+  }
+  vec4 final_color = colorMixed * gl_LightSource[0].ambient;
+  vec3 N = normalize(normal);
+  vec3 L = lightDir;
+  float lambertTerm = max(dot(N, L), 0.0);
+  final_color += gl_LightSource[0].diffuse * colorMixed * lambertTerm;
+  vec3 E = eyeVec;
+  vec3 R = reflect(-L, N);
+  float spec = pow(max(dot(R, E), 0.0), 0.9 + 1e-20);
+  final_color += gl_LightSource[0].specular * spec;
+  gl_FragColor = mix(colorMixed, final_color, lighting);
+}
+)";
   }
 
   // virtual void onSound(AudioIOData &io) {
