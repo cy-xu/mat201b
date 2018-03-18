@@ -587,7 +587,8 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
   // for sound
   // gam::SineD<> sined;
   // gam::Accum<> timer;
-  gam::SamplePlayer<> eatSound;  // Uses linear interpolation
+  gam::SamplePlayer<> eatSound;    // Uses linear interpolation
+  gam::SamplePlayer<> oceanSound;  // Uses linear interpolation
   // bool soundPlaying = false;
 
   MyApp()
@@ -672,6 +673,12 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
     eatSound.load(fullPathOrDie("water3.wav").c_str());
     eatSound.finish();
 
+    oceanSound.load(
+        fullPathOrDie(
+            "Underwater-Whale-Sounds---Full-60-Minute-Ambient-Soundscape.wav")
+            .c_str());
+    oceanSound.reset();
+
     initWindow();
     // initAudio();
 
@@ -680,8 +687,10 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
     AlloSphereAudioSpatializer::initSpatialization();
     // if gamma
     gam::Sync::master().spu(AlloSphereAudioSpatializer::audioIO().fps());
-    scene()->addSource(aSoundSource);
-    aSoundSource.dopplerType(DOPPLER_NONE);
+    // scene()->addSource(aSoundSource);
+    // aSoundSource.dopplerType(DOPPLER_NONE);
+    // scene()->addSource(bSoundSource);
+    // bSoundSource.dopplerType(DOPPLER_NONE);
     // scene()->usePerSampleProcessing(true);
     scene()->usePerSampleProcessing(false);
 
@@ -779,7 +788,7 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
         me.pose.faceToward(planktonList[me.targetID].pose.pos(), 0.01);
       } else {
         planktonList[me.targetID].eaten();
-        eatSound.reset();
+        // eatSound.reset();
       }
 
       fishZeroList[i] = me;
@@ -906,9 +915,11 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
     light.pos(Vec3f(x, y, 1.f) * 10.f);
   }
 
-  SoundSource aSoundSource;
+  // SoundSource aSoundSource;
+  // SoundSource bSoundSource;
   virtual void onSound(AudioIOData &io) {
-    aSoundSource.pose(nav());
+    // aSoundSource.pose(nav());
+    // bSoundSource.pose(nav());
     while (io()) {
       // if (timer()) {
       //   // sined.set(rnd::uniform(220.0f, 880.0f), 0.5f, 1.0f);
@@ -921,14 +932,16 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
       // if (soundPlaying) {
 
       // XXX -- this is broken the line below should work, but it sounds
-      // terrible
-      aSoundSource.writeSample(eatSound());
+      // // terrible
+      // aSoundSource.writeSample(eatSound());
+      // bSoundSource.writeSample(oceanSound() * 0.2);
       //
       // these two lines should go onces the lien above works
-      // io.out(0) = io.out(1) = eatSound();
+      io.out(0) = eatSound();
+      io.out(1) = oceanSound();
     }
-    listener()->pose(nav());
-    scene()->render(io);
+    // listener()->pose(nav());
+    // scene()->render(io);
   }
 };
 
