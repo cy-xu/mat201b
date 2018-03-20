@@ -108,7 +108,7 @@ struct Plankton {
       Vec3f stay = stayInCircle();
 
       sep = sep * 1.5f;
-      stay = stay * 0.1f;
+      stay = stay * 0.5f;
 
       applyForce(sep);
       applyForce(stay);
@@ -218,13 +218,13 @@ struct Fish {
 
       sep = sep * 2.5f;
       ali = ali * 2.0f;
-      coh = coh * 1.0f;
+      coh = coh * 2.0f;
       stay = stay * 1.0f;
 
       applyForce(sep);
       applyForce(ali);
       applyForce(coh);
-      // applyForce(stay);
+      applyForce(stay);
 
       velocity += acceleration * timeStep;
       pose.pos() += velocity * timeStep;
@@ -594,12 +594,12 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
   MyApp()
       : maker(Simulator::defaultBroadcastIP()),
         InterfaceServerClient(Simulator::defaultInterfaceServerIP()) {
-    light.pos(0, 0, 0);  // place the light
-    nav().pos(0, 0, 0);  // place the viewer
+    light.pos(0, 0, 0);    // place the light
+    nav().pos(0, -15, 0);  // place the viewer
     background(Color(0.1));
 
     // set near/far clip
-    lens().near(0.1);
+    lens().near(0.5);
     lens().far(1000);  // increase far clip to 1000 GL Units
 
     // generate sphere with texture coordinates
@@ -742,6 +742,7 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
       mePosPointer = &me.pose.pos();
 
       me.update();
+      me.pose.faceToward(userFishZero.nav.pos(), 0.01);
 
       // get distance between user fish
       Vec3f diff_predator = me.pose.pos() - userFishZero.nav.pos();
@@ -785,7 +786,7 @@ struct MyApp : App, AlloSphereAudioSpatializer, InterfaceServerClient {
       }
       if (me.targetP_diff > 2 * sphereRadius) {
         me.seekTarget(planktonList[me.targetID].pose.pos());
-        me.pose.faceToward(planktonList[me.targetID].pose.pos(), 0.01);
+        // me.pose.faceToward(planktonList[me.targetID].pose.pos(), 0.01);
       } else {
         planktonList[me.targetID].eaten();
         // eatSound.reset();
